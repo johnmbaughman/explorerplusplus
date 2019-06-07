@@ -1,5 +1,11 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include <list>
+#include <vector>
 #include <stack>
 
 class CFileActionHandler
@@ -12,11 +18,14 @@ public:
 		std::wstring	strNewFilename;
 	};
 
+	typedef std::list<RenamedItem_t> RenamedItems_t;
+	typedef std::vector<LPCITEMIDLIST> DeletedItems_t;
+
 	CFileActionHandler();
 	~CFileActionHandler();
 
-	BOOL	RenameFiles(const std::list<RenamedItem_t> &ItemList);
-	BOOL	DeleteFiles(HWND hwnd,const std::list<std::wstring> &FullFilenameList,BOOL bPermanent,BOOL bSilent);
+	BOOL	RenameFiles(const RenamedItems_t &itemList);
+	HRESULT	DeleteFiles(HWND hwnd, DeletedItems_t &deletedItems, bool permanent, bool silent);
 
 	void	Undo();
 	BOOL	CanUndo() const;
@@ -35,14 +44,12 @@ private:
 	{
 		UndoType_t	Type;
 
-		/* Pointer to a structure containing
-		more detailed information about this
-		operation. */
-		void		*pInfo;
+		RenamedItems_t renamedItems;
+		DeletedItems_t deletedItems;
 	};
 
-	void	UndoRenameOperation(const std::list<RenamedItem_t> &RenamedItemList);
-	void	UndoDeleteOperation(const std::list<std::wstring> &DeletedItemList);
+	void	UndoRenameOperation(const RenamedItems_t &renamedItemList);
+	void	UndoDeleteOperation(const DeletedItems_t &deletedItemList);
 
 	std::stack<UndoItem_t>	m_stackFileActions;
 };

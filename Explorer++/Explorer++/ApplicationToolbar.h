@@ -1,11 +1,15 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
-#include <vector>
-#include "Explorer++_internal.h"
 #include "ApplicationToolbarDropHandler.h"
+#include "CoreInterface.h"
 #include "../Helper/BaseWindow.h"
-
-#import <msxml3.dll> raw_interfaces_only
+#include <MsXml2.h>
+#include <objbase.h>
+#include <vector>
 
 class CApplicationToolbar;
 class CApplicationToolbarDropHandler;
@@ -30,8 +34,8 @@ public:
 	void	SaveRegistrySettings(HKEY hParentKey);
 	void	LoadRegistrySettings(HKEY hParentKey);
 
-	void	SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pe);
-	void	LoadXMLSettings(MSXML2::IXMLDOMNode *pNode);
+	void	SaveXMLSettings(IXMLDOMDocument *pXMLDom,IXMLDOMElement *pe);
+	void	LoadXMLSettings(IXMLDOMNode *pNode);
 
 private:
 
@@ -90,6 +94,8 @@ private:
 	void				AddButtonToToolbar(const ApplicationButton_t &Button);
 	void				UpdateButton(int iItem);
 
+	void				OnToolbarContextMenuPreShow(HMENU menu, HWND sourceWindow);
+
 	ApplicationInfo_t	ProcessCommand(const std::wstring &Command);
 	ApplicationButton_t	*MapToolbarButtonToItem(int index);
 
@@ -105,4 +111,6 @@ private:
 	CApplicationToolbarDropHandler	*m_patd;
 
 	CApplicationToolbarPersistentSettings	*m_atps;
+
+	boost::signals2::connection	m_toolbarContextMenuConnection;
 };

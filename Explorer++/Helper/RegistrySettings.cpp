@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: RegistrySettings.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides various registry functionality.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <list>
@@ -96,7 +87,7 @@ LONG NRegistrySettings::SaveStringListToRegistry(HKEY hKey,const TCHAR *szBaseKe
 	LONG lRes;
 	int i = 0;
 
-	for each(auto str in strList)
+	for(const auto &str : strList)
 	{
 		StringCchPrintf(szItemKey,SIZEOF_ARRAY(szItemKey),_T("%s%d"),
 			szBaseKeyName,i++);

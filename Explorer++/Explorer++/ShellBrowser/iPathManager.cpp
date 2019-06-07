@@ -1,18 +1,13 @@
-/******************************************************************
- *
- * Project: ShellBrowser
- * File: iPathManager.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Remembers path history, and
  * includes the ability to browse
  * back/forward through a set
  * of paths.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include <list>
@@ -115,7 +110,7 @@ LPITEMIDLIST CPathManager::RetrieveAndValidateIdl(int iIndex)
 	return ILClone(ppidlList[m_iCurrent - 1]);
 }
 
-int CPathManager::GetNumBackPathsStored(void)
+int CPathManager::GetNumBackPathsStored(void) const
 {
 	/* CurrentPath pointer points to the current path in the array.
 	All items before this one are 'back' paths, all items after
@@ -123,7 +118,7 @@ int CPathManager::GetNumBackPathsStored(void)
 	return m_iCurrent - 1;
 }
 
-int CPathManager::GetNumForwardPathsStored(void)
+int CPathManager::GetNumForwardPathsStored(void) const
 {
 	/* iNumStoredPaths indexes the end of the array.
 	Difference between it and the iCurrentPath index
@@ -131,7 +126,7 @@ int CPathManager::GetNumForwardPathsStored(void)
 	return m_nTotal - m_iCurrent;
 }
 
-std::list<LPITEMIDLIST> CPathManager::GetBackHistory()
+std::list<LPITEMIDLIST> CPathManager::GetBackHistory() const
 {
 	std::list<LPITEMIDLIST> history;
 
@@ -146,7 +141,7 @@ std::list<LPITEMIDLIST> CPathManager::GetBackHistory()
 	return history;
 }
 
-std::list<LPITEMIDLIST> CPathManager::GetForwardHistory()
+std::list<LPITEMIDLIST> CPathManager::GetForwardHistory() const
 {
 	std::list<LPITEMIDLIST> history;
 

@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: FolderSize.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Calculates the size of a given folder.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <list>
@@ -17,7 +8,7 @@
 #include "Macros.h"
 
 
-HRESULT CalculateFolderSize(TCHAR *szPath,int *nFolders,
+HRESULT CalculateFolderSize(const TCHAR *szPath,int *nFolders,
 int *nFiles,PULARGE_INTEGER lTotalFolderSize)
 {
 	HANDLE			hFirstFile;
@@ -27,7 +18,6 @@ int *nFiles,PULARGE_INTEGER lTotalFolderSize)
 	ULARGE_INTEGER	l_TotalFolderSize;
 	ULARGE_INTEGER	r_TotalFolderSize;
 	ULARGE_INTEGER	lFileSize;
-	BOOL			bTerminated = FALSE;
 	int				l_NumFiles = 0;
 	int				l_NumFolders = 0;
 	int				r_NumFiles = 0;
@@ -86,9 +76,6 @@ int *nFiles,PULARGE_INTEGER lTotalFolderSize)
 			}
 		}
 	}
-
-	if(bTerminated)
-		ExitThread(0);
 
 	*nFolders					= l_NumFolders;
 	*nFiles						= l_NumFiles;

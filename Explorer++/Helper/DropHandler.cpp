@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: DropHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Manages drag and drop functionality.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <list>
@@ -1172,7 +1163,7 @@ BOOL CopyDroppedFilesInternalAsync(PastedFilesInfo_t *ppfi)
 	{
 		std::list<std::wstring> FilenameList;
 
-		for each(auto FullFilename in ppfi->FullFilenameList)
+		for(const auto &FullFilename : ppfi->FullFilenameList)
 		{
 			TCHAR szFilename[MAX_PATH];
 			StringCchCopy(szFilename,SIZEOF_ARRAY(szFilename),FullFilename.c_str());

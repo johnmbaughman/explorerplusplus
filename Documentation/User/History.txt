@@ -6,6 +6,9 @@ Current version: 1.3.5
 Version 1.4.0
 -------------
 New features:
+- Settings are now automatically saved every 30 seconds. This
+  helps to prevent recent tabs or other settings from being lost
+  if the application crashes.
 - Support for the "Date Deleted" and "Original Location" recycle
   bin columns has been implemented.
 - When renaming a file, it's possible to move to the next item by
@@ -13,9 +16,33 @@ New features:
   item.
 
 Bug fixes:
+- The way in which column results and file icons/thumbnails are
+  retrieved has been updated. This update brings a number of
+  advantages:
+  - Because of the way in which column result/icons/thumbnails
+    were retrieved previously, it was possible for the
+    application to crash if a navigation occurred while one of
+    these items was being retrieved. Navigating to a different
+    directory or closing a tab while results are being retrieved
+    should now have no negative effects.
+  - Column details are only retrieved for items that are visible
+    (rather than all items).
+  - Previously, it was possible for a user interface update to be
+    done after a navigation had occurred. That is, column data
+    for an item in a previous folder would be inserted into the
+    listview for the current folder. This is no longer possible.
+  - Previously, if an item was moved (within the listview) or
+    deleted, it was possible for the wrong item to be updated
+    once a column result/icon/thumbnail had been retrieved. This
+    is no longer possible.
 - When right-clicking on the listview background in Windows 10,
   Explorer++ would crash. To resolve this, the OneDrive shell
   extension is now ignored when showing the menu. See #35.
+- Items in virtual folders (e.g. library folders) can now be
+  renamed and deleted.
+- Items can now be copied to/moved to virtual folders (using the
+  "Copy To Folder"/"Move To Folder" functionality).
+- New folders can now be created in virtual folders.
 - Fixed issue with date conversion. Previously, dates would be
   converted in the current time zone, rather than the time zone
   in effect at the time being converted.
@@ -44,6 +71,8 @@ Bug fixes:
   in the same month/year as the current date. Fixed.
 - When opening the set file attributes dialog, the creation date
   shown was incorrect. Fixed.
+- The set file attributes dialog wasn't correctly handling the
+  case where an attribute checkbox was indeterminate. Fixed.
 - There was an issue that meant that the group sorting direction
   in one tab could affect the group sorting order in other tabs.
   Fixed.
@@ -59,10 +88,22 @@ Misc:
 - Builds are now digitally signed.
 - All menus are now drawn in the standard system style, rather
   than a custom style.
+- More detailed help information is now available when starting
+  Explorer++ from the command line with the --help flag. Each of
+  the available options is listed and briefly described. The
+  names of some of the options have also been updated.
 - The format used to display dates has been updated. Previously,
   the date and time were separated by a comma. Now, they're
   separated by a space.
 - Dates are now displayed without seconds.
+- Infotips for files/folders are now retrieved on a background
+  thread. This stops the application from hanging when
+  retrieving the infotip for a large folder.
+- Listview icons are now cached. This helps to avoid the
+  flickering that can occur when refreshing a directory or going
+  back/forward (the apparent flickering occurs as the default
+  file/folder icons are replaced with the actual file/folder
+  icons).
 - The way in which the document summary fields (e.g. title,
   subject) are retrieved has been updated. This means that the
   fields should now be displayed for more file types (e.g. Word

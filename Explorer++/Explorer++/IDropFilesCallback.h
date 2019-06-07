@@ -1,6 +1,10 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
-#include "Explorer++_internal.h"
+#include "CoreInterface.h"
 #include "../Helper/DropHandler.h"
 
 class CDropFilesCallback : public IDropFilesCallback

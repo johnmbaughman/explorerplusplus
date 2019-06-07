@@ -1,26 +1,19 @@
-/******************************************************************
- *
- * Project: Helper
- * File: ShellHelper.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides various shell related functionality.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <boost\algorithm\string\join.hpp>
-#include <boost\algorithm\string\predicate.hpp>
+#include "ShellHelper.h"
 #include "FileOperations.h"
 #include "Helper.h"
 #include "Macros.h"
 #include "ProcessHelper.h"
 #include "RegistrySettings.h"
-#include "ShellHelper.h"
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/scope_exit.hpp>
 
+#pragma warning(disable:4459) // declaration of 'boost_scope_exit_aux_args' hides global declaration
 
 HRESULT AddJumpListTasksInternal(IObjectCollection *poc,
 	const std::list<JumpListTaskInformation> &TaskList);
@@ -80,9 +73,9 @@ HRESULT GetDisplayName(const TCHAR *szParsingPath,TCHAR *szDisplayName,UINT cchM
 	return hr;
 }
 
-HRESULT GetDisplayName(LPCITEMIDLIST pidlDirectory,TCHAR *szDisplayName,UINT cchMax,DWORD uFlags)
+HRESULT GetDisplayName(LPCITEMIDLIST pidl,TCHAR *szDisplayName,UINT cchMax,DWORD uFlags)
 {
-	if(pidlDirectory == NULL ||
+	if(pidl == NULL ||
 		szDisplayName == NULL)
 	{
 		return E_FAIL;
@@ -93,7 +86,7 @@ HRESULT GetDisplayName(LPCITEMIDLIST pidlDirectory,TCHAR *szDisplayName,UINT cch
 	STRRET str;
 	HRESULT hr;
 
-	hr = SHBindToParent(pidlDirectory, IID_PPV_ARGS(&pShellFolder),
+	hr = SHBindToParent(pidl, IID_PPV_ARGS(&pShellFolder),
 	(LPCITEMIDLIST *)&pidlRelative);
 
 	if(SUCCEEDED(hr))
@@ -102,7 +95,7 @@ HRESULT GetDisplayName(LPCITEMIDLIST pidlDirectory,TCHAR *szDisplayName,UINT cch
 
 		if(SUCCEEDED(hr))
 		{
-			hr = StrRetToBuf(&str,pidlDirectory,szDisplayName,cchMax);
+			hr = StrRetToBuf(&str,pidl,szDisplayName,cchMax);
 		}
 
 		pShellFolder->Release();
@@ -552,7 +545,7 @@ HRESULT BuildHDropList(FORMATETC *pftc,STGMEDIUM *pstg,
 
 	uSize = sizeof(DROPFILES);
 
-	for each(auto Filename in FilenameList)
+	for(const auto &Filename : FilenameList)
 	{
 		uSize += static_cast<UINT>((Filename.length() + 1) * sizeof(TCHAR));
 	}
@@ -582,7 +575,7 @@ HRESULT BuildHDropList(FORMATETC *pftc,STGMEDIUM *pstg,
 
 	TCHAR chNull = '\0';
 
-	for each(auto Filename in FilenameList)
+	for(const auto &Filename : FilenameList)
 	{
 		pData = static_cast<LPBYTE>(pcidaData) + sizeof(DROPFILES) + uOffset;
 
@@ -638,7 +631,7 @@ HRESULT BuildShellIDList(FORMATETC *pftc,STGMEDIUM *pstg,
 	uSize += ILGetSize(pidlDirectory);
 
 	/* Add the total size of the child pidl's. */
-	for each(auto pidl in pidlList)
+	for(auto pidl : pidlList)
 	{
 		uSize += ILGetSize(pidl);
 	}
@@ -673,7 +666,7 @@ HRESULT BuildShellIDList(FORMATETC *pftc,STGMEDIUM *pstg,
 	uPreviousSize = ILGetSize(pidlDirectory);
 
 	/* Store each of the pidl's. */
-	for each(auto pidl in pidlList)
+	for(auto pidl : pidlList)
 	{
 		pOffsets[i + 1] = pOffsets[i] + uPreviousSize;
 
@@ -857,6 +850,32 @@ HRESULT ConvertGenericVariantToString(const VARIANT *vt, TCHAR *szDetail, size_t
 	}
 
 	return hr;
+}
+
+// Returns either the parsing path for the specified item, or its in
+// folder name. The in folder name will be returned when the parsing
+// path is a GUID (which typically shouldn't be displayed to the user).
+boost::optional<std::wstring> GetFolderPathForDisplay(LPCITEMIDLIST pidl)
+{
+	TCHAR parsingPath[MAX_PATH];
+	HRESULT hr = GetDisplayName(pidl, parsingPath, SIZEOF_ARRAY(parsingPath), SHGDN_FORPARSING);
+
+	if (FAILED(hr))
+	{
+		return boost::none;
+	}
+
+	if (IsPathGUID(parsingPath))
+	{
+		hr = GetDisplayName(pidl, parsingPath, SIZEOF_ARRAY(parsingPath), SHGDN_INFOLDER);
+
+		if (FAILED(hr))
+		{
+			return boost::none;
+		}
+	}
+
+	return parsingPath;
 }
 
 /* Returns TRUE if a path is a GUID;
@@ -1053,7 +1072,7 @@ HRESULT AddJumpListTasks(const std::list<JumpListTaskInformation> &TaskList)
 HRESULT AddJumpListTasksInternal(IObjectCollection *poc,
 	const std::list<JumpListTaskInformation> &TaskList)
 {
-	for each(auto jtli in TaskList)
+	for(const auto &jtli : TaskList)
 	{
 		AddJumpListTaskInternal(poc,jtli.pszName,
 			jtli.pszPath,jtli.pszArguments,
@@ -1327,6 +1346,12 @@ HRESULT GetItemInfoTip(LPCITEMIDLIST pidlComplete, TCHAR *szInfoTip, size_t cchM
 	return hr;
 }
 
+HRESULT ShowMultipleFileProperties(LPITEMIDLIST pidlDirectory, LPCITEMIDLIST *ppidl,
+	HWND hwndOwner, int nFiles)
+{
+	return ExecuteActionFromContextMenu(pidlDirectory, ppidl, hwndOwner, nFiles, _T("properties"), 0);
+}
+
 HRESULT ExecuteActionFromContextMenu(LPITEMIDLIST pidlDirectory,
 	LPCITEMIDLIST *ppidl, HWND hwndOwner, int nFiles, const TCHAR *szAction, DWORD fMask)
 {
@@ -1389,4 +1414,35 @@ HRESULT ExecuteActionFromContextMenu(LPITEMIDLIST pidlDirectory,
 	}
 
 	return hr;
+}
+
+BOOL CompareVirtualFolders(const TCHAR *szDirectory, UINT uFolderCSIDL)
+{
+	TCHAR szParsingPath[MAX_PATH];
+
+	GetCsidlDisplayName(uFolderCSIDL, szParsingPath, SIZEOF_ARRAY(szParsingPath), SHGDN_FORPARSING);
+
+	if (StrCmp(szDirectory, szParsingPath) == 0)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+bool IsChildOfLibrariesFolder(PIDLIST_ABSOLUTE pidl)
+{
+	PIDLIST_ABSOLUTE pidlLibraries;
+	HRESULT hr = SHGetKnownFolderIDList(FOLDERID_Libraries, 0, nullptr, &pidlLibraries);
+
+	if (FAILED(hr))
+	{
+		return false;
+	}
+
+	BOOST_SCOPE_EXIT(pidlLibraries) {
+		CoTaskMemFree(pidlLibraries);
+	} BOOST_SCOPE_EXIT_END
+
+	return ILIsParent(pidlLibraries, pidl, FALSE);
 }

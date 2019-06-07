@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: StatusBar.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides a degree of abstraction for a status bar.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <string>
@@ -85,7 +76,7 @@ void CStatusBar::HandleStatusBarMenuClose(void)
 
 	delete[] m_pPartWidths;
 
-	for each(auto strText in m_TextList)
+	for(const auto &strText : m_TextList)
 	{
 		/* Restore the text that was present before the menu was opened. */
 		SendMessage(m_hwnd,SB_SETTEXT,(WPARAM)i|0,

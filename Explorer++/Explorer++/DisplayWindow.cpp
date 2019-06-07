@@ -1,20 +1,14 @@
-/******************************************************************
-*
-* Project: Explorer++
-* File: DisplayWindow.cpp
-* License: GPL - See LICENSE in the top level directory
-*
-* Written by David Erceg
-* www.explorerplusplus.com
-*
-*****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "Config.h"
+#include "MainResource.h"
 #include "../DisplayWindow/DisplayWindow.h"
 #include "../Helper/FolderSize.h"
 #include "../Helper/ShellHelper.h"
-#include "MainResource.h"
 
 void Explorerplusplus::UpdateDisplayWindow(void)
 {
@@ -22,7 +16,7 @@ void Explorerplusplus::UpdateDisplayWindow(void)
 
 	DisplayWindow_ClearTextBuffer(m_hDisplayWindow);
 
-	nSelected = m_pActiveShellBrowser->QueryNumSelected();
+	nSelected = m_pActiveShellBrowser->GetNumSelected();
 
 	if (nSelected == 0)
 		UpdateDisplayWindowForZeroFiles();
@@ -94,7 +88,7 @@ void Explorerplusplus::UpdateDisplayWindowForZeroFiles(void)
 
 void Explorerplusplus::UpdateDisplayWindowForOneFile(void)
 {
-	WIN32_FIND_DATA	*pwfd = NULL;
+	WIN32_FIND_DATA	wfd;
 	SHFILEINFO		shfi;
 	TCHAR			szFullItemName[MAX_PATH];
 	TCHAR			szFileDate[256];
@@ -121,12 +115,12 @@ void Explorerplusplus::UpdateDisplayWindowForOneFile(void)
 
 			m_pActiveShellBrowser->QueryFullItemName(iSelected, szFullItemName, SIZEOF_ARRAY(szFullItemName));
 
-			pwfd = m_pActiveShellBrowser->QueryFileFindData(iSelected);
+			wfd = m_pActiveShellBrowser->QueryFileFindData(iSelected);
 
 			dwAttributes = GetFileAttributes(szFullItemName);
 
 			if (((dwAttributes & FILE_ATTRIBUTE_DIRECTORY) ==
-				FILE_ATTRIBUTE_DIRECTORY) && m_bShowFolderSizes)
+				FILE_ATTRIBUTE_DIRECTORY) && m_config->globalFolderSettings.showFolderSizes)
 			{
 				FolderSize_t	*pfs = NULL;
 				FolderSizeExtraInfo_t	*pfsei = NULL;
@@ -179,15 +173,15 @@ void Explorerplusplus::UpdateDisplayWindowForOneFile(void)
 			}
 			else
 			{
-				SHGetFileInfo(szFullItemName, pwfd->dwFileAttributes,
+				SHGetFileInfo(szFullItemName, wfd.dwFileAttributes,
 					&shfi, sizeof(shfi), SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES);
 
 				DisplayWindow_BufferText(m_hDisplayWindow, shfi.szTypeName);
 			}
 
-			CreateFileTimeString(&pwfd->ftLastWriteTime,
+			CreateFileTimeString(&wfd.ftLastWriteTime,
 				szFileDate, SIZEOF_ARRAY(szFileDate),
-				m_bShowFriendlyDatesGlobal);
+				m_config->globalFolderSettings.showFriendlyDates);
 
 			LoadString(m_hLanguageModule, IDS_GENERAL_DATEMODIFIED, szDateModified,
 				SIZEOF_ARRAY(szDateModified));
@@ -271,7 +265,7 @@ void Explorerplusplus::UpdateDisplayWindowForOneFile(void)
 						break;
 					}
 
-					if (uBitDepth == -1)
+					if (uBitDepth == 0)
 					{
 						LoadString(m_hLanguageModule, IDS_GENERAL_DISPLAYWINDOW_BITDEPTHUNKNOWN, szTemp, SIZEOF_ARRAY(szTemp));
 						StringCchCopy(szOutput, SIZEOF_ARRAY(szOutput), szTemp);
@@ -303,8 +297,8 @@ void Explorerplusplus::UpdateDisplayWindowForOneFile(void)
 			/* Only attempt to show file previews for files (not folders). Also, only
 			attempt to show a preview if the display window is actually active. */
 			if (((dwAttributes & FILE_ATTRIBUTE_DIRECTORY) !=
-				FILE_ATTRIBUTE_DIRECTORY) && m_bShowFilePreviews
-				&& m_bShowDisplayWindow)
+				FILE_ATTRIBUTE_DIRECTORY) && m_config->showFilePreviews
+				&& m_config->showDisplayWindow)
 			{
 				DisplayWindow_SetThumbnailFile(m_hDisplayWindow, szFullItemName, TRUE);
 			}
@@ -365,7 +359,7 @@ void Explorerplusplus::UpdateDisplayWindowForMultipleFiles(void)
 
 	DisplayWindow_SetThumbnailFile(m_hDisplayWindow, EMPTY_STRING, FALSE);
 
-	nSelected = m_pActiveShellBrowser->QueryNumSelected();
+	nSelected = m_pActiveShellBrowser->GetNumSelected();
 
 	LoadString(m_hLanguageModule, IDS_GENERAL_SELECTED_MOREITEMS,
 		szMore, SIZEOF_ARRAY(szMore));
@@ -377,10 +371,11 @@ void Explorerplusplus::UpdateDisplayWindowForMultipleFiles(void)
 
 	if (!m_pActiveShellBrowser->InVirtualFolder())
 	{
-		m_pActiveShellBrowser->QueryFolderInfo(&FolderInfo);
+		m_pActiveShellBrowser->GetFolderInfo(&FolderInfo);
 
 		FormatSizeString(FolderInfo.TotalSelectionSize, szTotalSizeFragment,
-			SIZEOF_ARRAY(szTotalSizeFragment), m_bForceSize, m_SizeDisplayFormat);
+			SIZEOF_ARRAY(szTotalSizeFragment), m_config->globalFolderSettings.forceSize,
+			m_config->globalFolderSettings.sizeDisplayFormat);
 
 		LoadString(m_hLanguageModule, IDS_GENERAL_TOTALFILESIZE,
 			szTotalSizeString, SIZEOF_ARRAY(szTotalSizeString));

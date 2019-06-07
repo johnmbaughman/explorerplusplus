@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include <list>
@@ -8,11 +12,11 @@ public:
 	CPathManager();
 	~CPathManager();
 
-	int				GetNumBackPathsStored(void);
-	int				GetNumForwardPathsStored(void);
+	int				GetNumBackPathsStored(void) const;
+	int				GetNumForwardPathsStored(void) const;
 	UINT			CreateHistoryPopupMenu(HWND,POINT *,BOOL);
-	std::list<LPITEMIDLIST>	GetBackHistory();
-	std::list<LPITEMIDLIST>	GetForwardHistory();
+	std::list<LPITEMIDLIST>	GetBackHistory() const;
+	std::list<LPITEMIDLIST>	GetForwardHistory() const;
 
 	void			StoreIdl(LPITEMIDLIST pidl);
 	LPITEMIDLIST	RetrievePath(int iIndex);

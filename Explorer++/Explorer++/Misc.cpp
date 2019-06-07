@@ -1,64 +1,38 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: Misc.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Includes miscellaneous functions related to
- * the top-level GUI component.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
-#include <shobjidl.h>
 #include "Explorer++.h"
-#include "SelectColumnsDialog.h"
+#include "Config.h"
 #include "DefaultColumns.h"
+#include "Explorer++_internal.h"
+#include "HardwareChangeNotifier.h"
 #include "MainResource.h"
+#include "SelectColumnsDialog.h"
+#include "../Helper/Controls.h"
 #include "../Helper/FileOperations.h"
 #include "../Helper/Helper.h"
-#include "../Helper/Controls.h"
-#include "../Helper/ShellHelper.h"
 #include "../Helper/ListViewHelper.h"
-#include "../Helper/ProcessHelper.h"
-#include "../Helper/WindowHelper.h"
-#include "../Helper/Macros.h"
 #include "../Helper/Logging.h"
-
+#include "../Helper/Macros.h"
+#include "../Helper/ProcessHelper.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/WindowHelper.h"
+#include "../MyTreeView/MyTreeView.h"
+#include <boost/range/adaptor/map.hpp>
+#include <shobjidl.h>
+#include <list>
 
 void Explorerplusplus::ValidateLoadedSettings(void)
 {
-	if(m_TreeViewWidth <= 0)
-		m_TreeViewWidth = DEFAULT_TREEVIEW_WIDTH;
+	if(m_config->treeViewWidth <= 0)
+		m_config->treeViewWidth = Config::DEFAULT_TREEVIEW_WIDTH;
 
-	if(m_DisplayWindowHeight < MINIMUM_DISPLAYWINDOW_HEIGHT)
-		m_DisplayWindowHeight = DEFAULT_DISPLAYWINDOW_HEIGHT;
+	if(m_config->displayWindowHeight < MINIMUM_DISPLAYWINDOW_HEIGHT)
+		m_config->displayWindowHeight = Config::DEFAULT_DISPLAYWINDOW_HEIGHT;
 
 	ValidateColumns();
-	ValidateToolbarSettings();
-}
-
-void Explorerplusplus::ValidateToolbarSettings(void)
-{
-	BOOL bCorrupted = FALSE;
-
-	for(auto itr = m_tbInitial.begin();itr != m_tbInitial.end();itr++)
-	{
-		if(itr->iItemID < TOOLBAR_ID_START)
-		{
-			bCorrupted = TRUE;
-			break;
-		}
-	}
-
-	if(bCorrupted)
-	{
-		SetInitialToolbarButtons();
-	}
 }
 
 void Explorerplusplus::ValidateColumns(void)
@@ -157,7 +131,7 @@ void Explorerplusplus::ValidateSingleColumnSet(int iColumnSet,std::list<Column_t
 
 void Explorerplusplus::ApplyLoadedSettings(void)
 {
-	m_pMyTreeView->SetShowHidden(m_bShowHiddenGlobal);
+	m_pMyTreeView->SetShowHidden(m_config->defaultFolderSettings.showHidden);
 }
 
 void Explorerplusplus::ApplyToolbarSettings(void)
@@ -172,23 +146,23 @@ void Explorerplusplus::ApplyToolbarSettings(void)
 		switch(m_ToolbarInformation[i].wID)
 		{
 		case ID_MAINTOOLBAR:
-			bVisible = m_bShowMainToolbar;
+			bVisible = m_config->showMainToolbar;
 			break;
 
 		case ID_ADDRESSTOOLBAR:
-			bVisible = m_bShowAddressBar;
+			bVisible = m_config->showAddressBar;
 			break;
 
 		case ID_BOOKMARKSTOOLBAR:
-			bVisible = m_bShowBookmarksToolbar;
+			bVisible = m_config->showBookmarksToolbar;
 			break;
 
 		case ID_DRIVESTOOLBAR:
-			bVisible = m_bShowDrivesToolbar;
+			bVisible = m_config->showDrivesToolbar;
 			break;
 
 		case ID_APPLICATIONSTOOLBAR:
-			bVisible = m_bShowApplicationToolbar;
+			bVisible = m_config->showApplicationToolbar;
 			break;
 		}
 
@@ -196,7 +170,7 @@ void Explorerplusplus::ApplyToolbarSettings(void)
 			AddStyleToToolbar(&m_ToolbarInformation[i].fStyle,RBBS_HIDDEN);
 	}
 
-	if(m_bLockToolbars)
+	if(m_config->lockToolbars)
 	{
 		for(i = 0;i < NUM_MAIN_TOOLBARS;i++)
 		{
@@ -224,7 +198,7 @@ void Explorerplusplus::AdjustFolderPanePosition(void)
 		IndentTop += RebarRect.bottom - RebarRect.top;
 	}
 
-	if(m_bShowStatusBar)
+	if(m_config->showStatusBar)
 	{
 		RECT m_hStatusBarRect;
 
@@ -233,7 +207,7 @@ void Explorerplusplus::AdjustFolderPanePosition(void)
 		IndentBottom += m_hStatusBarRect.bottom - m_hStatusBarRect.top;
 	}
 
-	if(m_bShowDisplayWindow)
+	if(m_config->showDisplayWindow)
 	{
 		RECT rcDisplayWindow;
 
@@ -242,7 +216,7 @@ void Explorerplusplus::AdjustFolderPanePosition(void)
 		IndentBottom += rcDisplayWindow.bottom - rcDisplayWindow.top;
 	}
 
-	if(m_bShowFolders)
+	if(m_config->showFolders)
 	{
 		RECT rcHolder;
 		GetClientRect(m_hHolder,&rcHolder);
@@ -252,47 +226,33 @@ void Explorerplusplus::AdjustFolderPanePosition(void)
 	}
 }
 
-LRESULT Explorerplusplus::StatusBarMenuSelect(WPARAM wParam,LPARAM lParam)
-{
-	/* Is the menu been closed? .*/
-	if(HIWORD(wParam) == 0xFFFF && lParam == 0)
-	{
-		m_pStatusBar->HandleStatusBarMenuClose();
-	}
-	else
-	{
-		m_pStatusBar->HandleStatusBarMenuOpen();
-
-		TCHAR szBuffer[512];
-		LoadString(m_hLanguageModule,LOWORD(wParam),
-			szBuffer,SIZEOF_ARRAY(szBuffer));
-		SetWindowText(m_hStatusBar,szBuffer);
-	}
-
-	return 0;
-}
-
-void Explorerplusplus::CopyToFolder(BOOL bMove)
+void Explorerplusplus::CopyToFolder(bool move)
 {
 	if(ListView_GetSelectedCount(m_hActiveListView) == 0)
 	{
 		return;
 	}
 
-	std::list<std::wstring> FullFilenameList;
+	std::vector<PIDLPointer> pidlPtrs;
+	std::vector<LPCITEMIDLIST> pidls;
 	int iItem = -1;
 
-	while((iItem = ListView_GetNextItem(m_hActiveListView,iItem,LVNI_SELECTED)) != -1)
+	while ((iItem = ListView_GetNextItem(m_hActiveListView, iItem, LVNI_SELECTED)) != -1)
 	{
-		TCHAR szFullFilename[MAX_PATH];
-		m_pActiveShellBrowser->QueryFullItemName(iItem,szFullFilename,SIZEOF_ARRAY(szFullFilename));
+		PIDLPointer pidlPtr(m_pActiveShellBrowser->QueryItemCompleteIdl(iItem));
 
-		FullFilenameList.push_back(szFullFilename);
+		if (!pidlPtr)
+		{
+			continue;
+		}
+
+		pidls.push_back(pidlPtr.get());
+		pidlPtrs.push_back(std::move(pidlPtr));
 	}
 
 	TCHAR szTemp[128];
 	LoadString(m_hLanguageModule,IDS_GENERAL_COPY_TO_FOLDER_TITLE,szTemp,SIZEOF_ARRAY(szTemp));
-	NFileOperations::CopyFilesToFolder(m_hContainer,szTemp,FullFilenameList,bMove);
+	NFileOperations::CopyFilesToFolder(m_hContainer,szTemp,pidls,move);
 }
 
 LRESULT Explorerplusplus::OnDeviceChange(WPARAM wParam,LPARAM lParam)
@@ -300,15 +260,9 @@ LRESULT Explorerplusplus::OnDeviceChange(WPARAM wParam,LPARAM lParam)
 	/* Forward this notification out to all tabs (if a
 	tab is currently in my computer, it will need to
 	update its contents). */
-	int nTabs = TabCtrl_GetItemCount(m_hTabCtrl);
-
-	for(int i = 0;i < nTabs;i++)
+	for (auto &tab : m_tabContainer->GetAllTabs() | boost::adaptors::map_values)
 	{
-		TCITEM tcItem;
-		tcItem.mask = TCIF_PARAM;
-		TabCtrl_GetItem(m_hTabCtrl,i,&tcItem);
-
-		m_pShellBrowser[static_cast<int>(tcItem.lParam)]->OnDeviceChange(wParam,lParam);
+		tab.GetShellBrowser()->OnDeviceChange(wParam,lParam);
 	}
 
 	/* Forward the message to the treeview, so that
@@ -327,333 +281,6 @@ LRESULT Explorerplusplus::OnDeviceChange(WPARAM wParam,LPARAM lParam)
 	}
 
 	return TRUE;
-}
-
-HRESULT Explorerplusplus::TestListViewSelectionAttributes(SFGAOF *pItemAttributes) const
-{
-	LPITEMIDLIST	pidlDirectory = NULL;
-	LPITEMIDLIST	ridl = NULL;
-	LPITEMIDLIST	pidlComplete = NULL;
-	HRESULT			hr = E_FAIL;
-	int				iSelected;
-
-	iSelected = ListView_GetNextItem(m_hActiveListView,-1,LVNI_SELECTED);
-
-	if(iSelected != -1)
-	{
-		pidlDirectory = m_pActiveShellBrowser->QueryCurrentDirectoryIdl();
-
-		ridl = m_pActiveShellBrowser->QueryItemRelativeIdl(iSelected);
-
-		pidlComplete = ILCombine(pidlDirectory,ridl);
-
-		hr = GetItemAttributes(pidlComplete,pItemAttributes);
-
-		CoTaskMemFree(pidlComplete);
-		CoTaskMemFree(ridl);
-		CoTaskMemFree(pidlDirectory);
-	}
-
-	return hr;
-}
-
-HRESULT Explorerplusplus::TestTreeViewSelectionAttributes(SFGAOF *pItemAttributes) const
-{
-	HTREEITEM		hItem;
-	LPITEMIDLIST	pidl = NULL;
-	HRESULT			hr = E_FAIL;
-
-	hItem = TreeView_GetSelection(m_hTreeView);
-
-	if(hItem != NULL)
-	{
-		pidl = m_pMyTreeView->BuildPath(hItem);
-
-		hr = GetItemAttributes(pidl,pItemAttributes);
-
-		CoTaskMemFree(pidl);
-	}
-
-	return hr;
-}
-
-BOOL Explorerplusplus::IsRenamePossible(void) const
-{
-	return TestItemAttributes(SFGAO_CANRENAME);
-}
-
-BOOL Explorerplusplus::IsDeletionPossible(void) const
-{
-	return TestItemAttributes(SFGAO_CANDELETE);
-}
-
-BOOL Explorerplusplus::CanShowFileProperties(void) const
-{
-	return TestItemAttributes(SFGAO_HASPROPSHEET);
-}
-
-/* Returns TRUE if all the specified attributes are set on the selected items. */
-BOOL Explorerplusplus::TestItemAttributes(SFGAOF attributes) const
-{
-	SFGAOF commonAttributes = attributes;
-	HRESULT hr = GetSelectionAttributes(&commonAttributes);
-
-	if(SUCCEEDED(hr))
-	{
-		return (commonAttributes & attributes) == attributes;
-	}
-
-	return FALSE;
-}
-
-HRESULT Explorerplusplus::GetSelectionAttributes(SFGAOF *pItemAttributes) const
-{
-	HWND	hFocus;
-	HRESULT	hr = E_FAIL;
-
-	hFocus = GetFocus();
-
-	if(hFocus == m_hActiveListView)
-		hr = TestListViewSelectionAttributes(pItemAttributes);
-	else if(hFocus == m_hTreeView)
-		hr = TestTreeViewSelectionAttributes(pItemAttributes);
-
-	return hr;
-}
-
-BOOL Explorerplusplus::CanCutOrCopySelection(void) const
-{
-	HWND hFocus;
-
-	hFocus = GetFocus();
-
-	if(hFocus == m_hActiveListView)
-	{
-		return m_nSelected && AreAllSelectedFilesReal();
-	}
-	else if(hFocus == m_hTreeView)
-	{
-		HTREEITEM		hItem;
-		LPITEMIDLIST	pidl = NULL;
-		SFGAOF			Attributes;
-		HRESULT			hr;
-
-		hItem = TreeView_GetSelection(m_hTreeView);
-
-		if(hItem != NULL)
-		{
-			pidl = m_pMyTreeView->BuildPath(hItem);
-
-			Attributes = SFGAO_CANCOPY;// | SFGAO_CANMOVE;
-
-			hr = GetItemAttributes(pidl,&Attributes);
-
-			CoTaskMemFree(pidl);
-
-			if(hr == S_OK)
-				return TRUE;
-		}
-
-		return FALSE;
-	}
-
-	return FALSE;
-}
-
-BOOL Explorerplusplus::CanPaste(void) const
-{
-	HWND hFocus = GetFocus();
-
-	std::list<FORMATETC> ftcList;
-	CDropHandler::GetDropFormats(ftcList);
-
-	BOOL bDataAvailable = FALSE;
-
-	/* Check whether the drop source has the type of data
-	that is needed for this drag operation. */
-	for each(auto ftc in ftcList)
-	{
-		if(IsClipboardFormatAvailable(ftc.cfFormat))
-		{
-			bDataAvailable = TRUE;
-			break;
-		}
-	}
-
-	if(hFocus == m_hActiveListView)
-	{
-		return bDataAvailable && m_pActiveShellBrowser->CanCreate();
-	}
-	else if(hFocus == m_hTreeView)
-	{
-		HTREEITEM		hItem;
-		LPITEMIDLIST	pidl = NULL;
-		SFGAOF			Attributes;
-		HRESULT			hr;
-
-		hItem = TreeView_GetSelection(m_hTreeView);
-
-		if(hItem != NULL)
-		{
-			pidl = m_pMyTreeView->BuildPath(hItem);
-
-			Attributes = SFGAO_FILESYSTEM;
-
-			hr = GetItemAttributes(pidl,&Attributes);
-
-			CoTaskMemFree(pidl);
-
-			if(hr == S_OK)
-				return bDataAvailable;
-		}
-	}
-
-	return FALSE;
-}
-
-BOOL Explorerplusplus::AreAllSelectedFilesReal(void) const
-{
-	int iItem = -1;
-
-	if(m_nSelected == 0)
-		return FALSE;
-
-	while((iItem = ListView_GetNextItem(m_hActiveListView,iItem,LVNI_SELECTED)) != -1)
-	{
-		if(!m_pActiveShellBrowser->IsFileReal(iItem))
-			return FALSE;
-	}
-
-	return TRUE;
-}
-
-HRESULT Explorerplusplus::UpdateStatusBarText(void)
-{
-	FolderInfo_t	FolderInfo;
-	int				nTotal;
-	int				nFilesSelected;
-	int				nFoldersSelected;
-	TCHAR			szItemsSelected[64];
-	TCHAR			lpszSizeBuffer[32];
-	TCHAR			szBuffer[64];
-	TCHAR			szTemp[64];
-	TCHAR			*szNumSelected = NULL;
-	int				res;
-
-	nTotal				= m_pActiveShellBrowser->QueryNumItems();
-	nFilesSelected		= m_pActiveShellBrowser->QueryNumSelectedFiles();
-	nFoldersSelected	= m_pActiveShellBrowser->QueryNumSelectedFolders();
-
-	if((nFilesSelected + nFoldersSelected) != 0)
-	{
-		szNumSelected = PrintComma(nFilesSelected + nFoldersSelected);
-
-		if((nFilesSelected + nFoldersSelected) == 1)
-		{
-			LoadString(m_hLanguageModule,IDS_GENERAL_SELECTED_ONEITEM,szTemp,
-				SIZEOF_ARRAY(szTemp));
-
-			/* One item selected. Form:
-			1 item selected */
-			StringCchPrintf(szItemsSelected,SIZEOF_ARRAY(szItemsSelected),
-			_T("%s %s"),szNumSelected,szTemp);
-		}
-		else
-		{
-			LoadString(m_hLanguageModule,IDS_GENERAL_SELECTED_MOREITEMS,szTemp,
-				SIZEOF_ARRAY(szTemp));
-
-			/* More than one item selected. Form:
-			n items selected */
-			StringCchPrintf(szItemsSelected,SIZEOF_ARRAY(szItemsSelected),
-			_T("%s %s"),szNumSelected,szTemp);
-		}
-	}
-	else
-	{
-		szNumSelected = PrintComma(nTotal);
-
-		if(nTotal == 1)
-		{
-			LoadString(m_hLanguageModule,IDS_GENERAL_ONEITEM,szTemp,
-				SIZEOF_ARRAY(szTemp));
-
-			/* Text: '1 item' */
-			StringCchPrintf(szItemsSelected,SIZEOF_ARRAY(szItemsSelected),
-			_T("%s %s"),szNumSelected,szTemp);
-		}
-		else
-		{
-			LoadString(m_hLanguageModule,IDS_GENERAL_MOREITEMS,szTemp,
-				SIZEOF_ARRAY(szTemp));
-
-			/* Text: 'n Items' */
-			StringCchPrintf(szItemsSelected,SIZEOF_ARRAY(szItemsSelected),
-			_T("%s %s"),szNumSelected,szTemp);
-		}
-	}
-
-	SendMessage(m_hStatusBar,SB_SETTEXT,(WPARAM)0|0,(LPARAM)szItemsSelected);
-
-	if(m_pActiveShellBrowser->InVirtualFolder())
-	{
-		LoadString(m_hLanguageModule,IDS_GENERAL_VIRTUALFOLDER,lpszSizeBuffer,
-			SIZEOF_ARRAY(lpszSizeBuffer));
-	}
-	else
-	{
-		m_pActiveShellBrowser->QueryFolderInfo(&FolderInfo);
-
-		if((nFilesSelected + nFoldersSelected) == 0)
-		{
-			/* No items(files or folders) selected. */
-			FormatSizeString(FolderInfo.TotalFolderSize,lpszSizeBuffer,
-				SIZEOF_ARRAY(lpszSizeBuffer),m_bForceSize,m_SizeDisplayFormat);
-		}
-		else
-		{
-			if(nFilesSelected == 0)
-			{
-				/* Only folders selected. Don't show any size in the status bar. */
-				StringCchCopy(lpszSizeBuffer,SIZEOF_ARRAY(lpszSizeBuffer),EMPTY_STRING);
-			}
-			else
-			{
-				/* Mixture of files and folders selected. Show size of currently
-				selected files. */
-				FormatSizeString(FolderInfo.TotalSelectionSize,lpszSizeBuffer,
-					SIZEOF_ARRAY(lpszSizeBuffer),m_bForceSize,m_SizeDisplayFormat);
-			}
-		}
-	}
-
-	SendMessage(m_hStatusBar,SB_SETTEXT,(WPARAM)1|0,(LPARAM)lpszSizeBuffer);
-
-	res = CreateDriveFreeSpaceString(m_CurrentDirectory,szBuffer,SIZEOF_ARRAY(szBuffer));
-
-	if(res == -1)
-		StringCchCopy(szBuffer,SIZEOF_ARRAY(szBuffer),EMPTY_STRING);
-
-	SendMessage(m_hStatusBar,SB_SETTEXT,(WPARAM)2|0,(LPARAM)szBuffer);
-
-	return S_OK;
-}
-
-BOOL Explorerplusplus::CompareVirtualFolders(UINT uFolderCSIDL)
-{
-	return CompareVirtualFolders(m_CurrentDirectory,uFolderCSIDL);
-}
-
-BOOL Explorerplusplus::CompareVirtualFolders(const TCHAR *szDirectory, UINT uFolderCSIDL)
-{
-	TCHAR szParsingPath[MAX_PATH];
-
-	GetCsidlDisplayName(uFolderCSIDL,szParsingPath,SIZEOF_ARRAY(szParsingPath),SHGDN_FORPARSING);
-
-	if(StrCmp(szDirectory,szParsingPath) == 0)
-		return TRUE;
-
-	return FALSE;
 }
 
 /*
@@ -677,24 +304,21 @@ void *pData)
 	DirectoryAltered_t	*pDirectoryAltered = NULL;
 	Explorerplusplus			*pContainer = NULL;
 
-	EnterCriticalSection(&g_csDirMonCallback);
-
 	pDirectoryAltered = (DirectoryAltered_t *)pData;
 	pContainer = (Explorerplusplus *)pDirectoryAltered->pData;
 
-	/* Does this tab still exist? */
-	if(pContainer->m_uTabMap[pDirectoryAltered->iIndex] == 1)
+	Tab *tab = pContainer->m_tabContainer->GetTabOptional(pDirectoryAltered->iIndex);
+
+	if (tab)
 	{
 		TCHAR szDirectory[MAX_PATH];
-		pContainer->m_pShellBrowser[pDirectoryAltered->iIndex]->QueryCurrentDirectory(SIZEOF_ARRAY(szDirectory),szDirectory);
+		tab->GetShellBrowser()->QueryCurrentDirectory(SIZEOF_ARRAY(szDirectory), szDirectory);
 		LOG(debug) << _T("Directory change notification received for \"") << szDirectory << _T("\", Action = ") << dwAction
 			<< _T(", Filename = \"") << szFileName << _T("\"");
 
-		pContainer->m_pShellBrowser[pDirectoryAltered->iIndex]->FilesModified(dwAction,
-			szFileName,pDirectoryAltered->iIndex,pDirectoryAltered->iFolderIndex);
+		tab->GetShellBrowser()->FilesModified(dwAction,
+			szFileName, pDirectoryAltered->iIndex, pDirectoryAltered->iFolderIndex);
 	}
-
-	LeaveCriticalSection(&g_csDirMonCallback);
 }
 
 void FolderSizeCallbackStub(int nFolders,int nFiles,PULARGE_INTEGER lTotalFolderSize,LPVOID pData)
@@ -723,18 +347,6 @@ int nFolders,int nFiles,PULARGE_INTEGER lTotalFolderSize)
 	be shown. */
 	PostMessage(m_hContainer,WM_APP_FOLDERSIZECOMPLETED,
 		(WPARAM)pDWFolderSizeCompletion,0);
-}
-
-void Explorerplusplus::CreateViewsMenu(POINT *ptOrigin)
-{
-	UINT uViewMode = m_pActiveShellBrowser->GetCurrentViewMode();
-
-	int ItemToCheck = GetViewModeMenuId(uViewMode);
-	CheckMenuRadioItem(m_hViewsMenu,IDM_VIEW_THUMBNAILS,IDM_VIEW_EXTRALARGEICONS,
-		ItemToCheck,MF_BYCOMMAND);
-
-	TrackPopupMenu(m_hViewsMenu,TPM_LEFTALIGN,ptOrigin->x,ptOrigin->y,
-		0,m_hContainer,NULL);
 }
 
 int Explorerplusplus::CreateDriveFreeSpaceString(const TCHAR *szPath, TCHAR *szBuffer, int nBuffer)
@@ -796,7 +408,7 @@ BOOL Explorerplusplus::AnyItemsSelected(void)
 
 void Explorerplusplus::OnSelectColumns()
 {
-	CSelectColumnsDialog SelectColumnsDialog(m_hLanguageModule,IDD_SELECTCOLUMNS,m_hContainer,this);
+	CSelectColumnsDialog SelectColumnsDialog(m_hLanguageModule,IDD_SELECTCOLUMNS,m_hContainer,this,m_tabContainer,this);
 	SelectColumnsDialog.ShowModalDialog();
 
 	UpdateArrangeMenuItems();

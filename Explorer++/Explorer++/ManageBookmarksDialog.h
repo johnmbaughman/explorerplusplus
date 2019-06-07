@@ -1,8 +1,14 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include "BookmarkHelper.h"
 #include "BookmarkListView.h"
 #include "BookmarkTreeView.h"
+#include "CoreInterface.h"
+#include "TabContainerInterface.h"
 #include "../Helper/BaseDialog.h"
 #include "../Helper/ResizableDialog.h"
 #include "../Helper/DialogSettings.h"
@@ -63,7 +69,8 @@ class CManageBookmarksDialog : public CBaseDialog, public NBookmark::IBookmarkIt
 {
 public:
 
-	CManageBookmarksDialog(HINSTANCE hInstance, int iResource, HWND hParent, IExplorerplusplus *pexpp, CBookmarkFolder &AllBookmarks);
+	CManageBookmarksDialog(HINSTANCE hInstance, int iResource, HWND hParent, IExplorerplusplus *pexpp,
+		TabContainerInterface *tabContainer, CBookmarkFolder &AllBookmarks);
 	~CManageBookmarksDialog();
 
 	int CALLBACK		SortBookmarks(LPARAM lParam1,LPARAM lParam2);
@@ -105,7 +112,7 @@ private:
 	void		SortListViewItems(NBookmarkHelper::SortMode_t SortMode);
 
 	void		GetColumnString(CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType,TCHAR *szColumn,UINT cchBuf);
-	void		GetBookmarkItemColumnInfo(const NBookmarkHelper::variantBookmark_t variantBookmark,CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType,TCHAR *szColumn,size_t cchBuf);
+	void		GetBookmarkItemColumnInfo(const VariantBookmark &variantBookmark, CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType, TCHAR *szColumn, size_t cchBuf);
 	void		GetBookmarkColumnInfo(const CBookmark &Bookmark,CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType,TCHAR *szColumn,size_t cchBuf);
 	void		GetBookmarkFolderColumnInfo(const CBookmarkFolder &BookmarkFolder,CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType,TCHAR *szColumn,size_t cchBuf);
 
@@ -142,6 +149,7 @@ private:
 	HIMAGELIST					m_himlToolbar;
 
 	IExplorerplusplus			*m_pexpp;
+	TabContainerInterface		*m_tabContainer;
 
 	CBookmarkFolder				&m_AllBookmarks;
 

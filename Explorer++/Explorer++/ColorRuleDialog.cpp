@@ -1,24 +1,16 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ColorRuleDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the new/edit color rule dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "ColorRuleDialog.h"
 #include "ColorRuleHelper.h"
 #include "MainResource.h"
 #include "../Helper/Helper.h"
-#include "../Helper/XMLSettings.h"
-#include "../Helper/WindowHelper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/StringHelper.h"
+#include "../Helper/WindowHelper.h"
+#include "../Helper/XMLSettings.h"
 
 
 namespace NColorRuleDialog
@@ -288,7 +280,7 @@ void CColorRuleDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 }
 
 void CColorRuleDialogPersistentSettings::SaveExtraXMLSettings(
-	MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pParentNode)
+	IXMLDOMDocument *pXMLDom,IXMLDOMElement *pParentNode)
 {
 	TCHAR szNode[32];
 

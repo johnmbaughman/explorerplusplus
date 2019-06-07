@@ -1,9 +1,8 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ApplicationToolbar.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Handles the application toolbar.
  *
  * Notes:
@@ -12,24 +11,20 @@
  *	<name="App1" command="C:\...">
  *	<name="App2" command="D:\...">
  * </ApplicationToolbar>
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
-#include <boost\algorithm\string.hpp>
-#include "Explorer++_internal.h"
-#include "ApplicationToolbarDropHandler.h"
-#include "ApplicationToolbarButtonDialog.h"
 #include "ApplicationToolbar.h"
+#include "ApplicationToolbarButtonDialog.h"
+#include "ApplicationToolbarDropHandler.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
-#include "../Helper/ShellHelper.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/XMLSettings.h"
 #include "../Helper/Controls.h"
 #include "../Helper/Macros.h"
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/XMLSettings.h"
+#include <boost\algorithm\string.hpp>
 
 
 const TCHAR CApplicationToolbarPersistentSettings::SETTING_NAME[] = _T("Name");
@@ -53,6 +48,8 @@ m_pexpp(pexpp)
 
 CApplicationToolbar::~CApplicationToolbar()
 {
+	m_toolbarContextMenuConnection.disconnect();
+
 	RemoveWindowSubclass(GetParent(m_hwnd),ParentWndProcStub,PARENT_SUBCLASS_ID);
 
 	RevokeDragDrop(m_hwnd);
@@ -86,6 +83,8 @@ void CApplicationToolbar::Initialize(HWND hParent)
 		reinterpret_cast<DWORD_PTR>(this));
 
 	AddButtonsToToolbar();
+
+	m_toolbarContextMenuConnection = m_pexpp->AddToolbarContextMenuObserver(boost::bind(&CApplicationToolbar::OnToolbarContextMenuPreShow, this, _1, _2));
 }
 
 LRESULT CALLBACK ParentWndProcStub(HWND hwnd,UINT uMsg,
@@ -188,7 +187,7 @@ LRESULT CALLBACK CApplicationToolbar::ParentWndProc(HWND hwnd,UINT uMsg,WPARAM w
 
 void CApplicationToolbar::AddButtonsToToolbar()
 {
-	for each(auto Button in m_atps->m_Buttons)
+	for(const auto &Button : m_atps->m_Buttons)
 	{
 		AddButtonToToolbar(Button);
 	}
@@ -448,6 +447,25 @@ void CApplicationToolbar::DeleteItem(int iItem)
 	}
 }
 
+void CApplicationToolbar::OnToolbarContextMenuPreShow(HMENU menu, HWND sourceWindow)
+{
+	if (sourceWindow != m_hwnd)
+	{
+		return;
+	}
+
+	TCHAR szTemp[64];
+	LoadString(m_hInstance, IDS_APPLICATIONBUTTON_NEW, szTemp, SIZEOF_ARRAY(szTemp));
+
+	MENUITEMINFO mii;
+	mii.cbSize = sizeof(mii);
+	mii.fMask = MIIM_ID | MIIM_STRING;
+	mii.dwTypeData = szTemp;
+	mii.wID = IDM_APP_NEW;
+
+	InsertMenuItem(menu, IDM_TOOLBARS_CUSTOMIZE, FALSE, &mii);
+}
+
 ApplicationButton_t *CApplicationToolbar::MapToolbarButtonToItem(int iIndex)
 {
 	if(iIndex == -1)
@@ -530,7 +548,7 @@ void CApplicationToolbarPersistentSettings::SaveRegistrySettings(HKEY hParentKey
 {
 	int index = 0;
 
-	for each(auto Button in m_Buttons)
+	for(const auto &Button : m_Buttons)
 	{
 		TCHAR szKeyName[32];
 		_itow_s(index,szKeyName,SIZEOF_ARRAY(szKeyName),10);
@@ -552,7 +570,7 @@ void CApplicationToolbarPersistentSettings::SaveRegistrySettings(HKEY hParentKey
 	}
 }
 
-void CApplicationToolbarPersistentSettings::LoadXMLSettings(MSXML2::IXMLDOMNode *pNode)
+void CApplicationToolbarPersistentSettings::LoadXMLSettings(IXMLDOMNode *pNode)
 {
 	TCHAR szName[512];
 	TCHAR szCommand[512];
@@ -561,7 +579,7 @@ void CApplicationToolbarPersistentSettings::LoadXMLSettings(MSXML2::IXMLDOMNode 
 	BOOL bNameFound = FALSE;
 	BOOL bCommandFound = FALSE;
 
-	MSXML2::IXMLDOMNamedNodeMap *am = NULL;
+	IXMLDOMNamedNodeMap *am = NULL;
 	HRESULT hr = pNode->get_attributes(&am);
 
 	if(FAILED(hr))
@@ -574,7 +592,7 @@ void CApplicationToolbarPersistentSettings::LoadXMLSettings(MSXML2::IXMLDOMNode 
 
 	for(int i = 0;i < lChildNodes;i++)
 	{
-		MSXML2::IXMLDOMNode *pAttributeNode = NULL;
+		IXMLDOMNode *pAttributeNode = NULL;
 		am->get_item(i,&pAttributeNode);
 
 		BSTR bstrName;
@@ -605,7 +623,7 @@ void CApplicationToolbarPersistentSettings::LoadXMLSettings(MSXML2::IXMLDOMNode 
 		AddButton(szName,szCommand,bShowNameOnToolbar,NULL);
 	}
 
-	MSXML2::IXMLDOMNode *pNextSibling = NULL;
+	IXMLDOMNode *pNextSibling = NULL;
 	hr = pNode->get_nextSibling(&pNextSibling);
 
 	if(hr == S_OK)
@@ -619,15 +637,15 @@ void CApplicationToolbarPersistentSettings::LoadXMLSettings(MSXML2::IXMLDOMNode 
 	}
 }
 
-void CApplicationToolbarPersistentSettings::SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pe)
+void CApplicationToolbarPersistentSettings::SaveXMLSettings(IXMLDOMDocument *pXMLDom,IXMLDOMElement *pe)
 {
 	BSTR bstr_wsntt = SysAllocString(L"\n\t\t");
 
-	for each(auto Button in m_Buttons)
+	for(const auto &Button : m_Buttons)
 	{
 		NXMLSettings::AddWhiteSpaceToNode(pXMLDom,bstr_wsntt,pe);
 
-		MSXML2::IXMLDOMElement *pParentNode = NULL;
+		IXMLDOMElement *pParentNode = NULL;
 		NXMLSettings::CreateElementNode(pXMLDom,&pParentNode,pe,_T("ApplicationButton"),Button.Name.c_str());
 		NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_COMMAND, Button.Command.c_str());
 		NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_SHOW_NAME_ON_TOOLBAR, NXMLSettings::EncodeBoolValue(Button.ShowNameOnToolbar));

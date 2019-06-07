@@ -1,6 +1,11 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include "TabContainer.h"
+#include "TabContainerInterface.h"
 #include "../Helper/DropHandler.h"
 
 class CTabDropHandler : public IDropTarget
@@ -9,7 +14,7 @@ class CTabDropHandler : public IDropTarget
 
 public:
 
-	CTabDropHandler(HWND hTabCtrl,CTabContainer *pTabContainer);
+	CTabDropHandler(HWND hTabCtrl, CTabContainer *tabContainer, TabContainerInterface *tabContainerInterface);
 	~CTabDropHandler();
 
 	/* IUnknown methods. */
@@ -39,7 +44,8 @@ private:
 	HWND				m_hTabCtrl;
 	ULONG				m_RefCount;
 
-	CTabContainer		*m_pTabContainer;
+	CTabContainer		*m_tabContainer;
+	TabContainerInterface	*m_tabContainerInterface;
 
 	IDragSourceHelper	*m_pDragSourceHelper;
 	IDropTargetHelper	*m_pDropTargetHelper;

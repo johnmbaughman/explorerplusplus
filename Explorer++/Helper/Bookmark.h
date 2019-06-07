@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include <list>
@@ -22,6 +26,8 @@ namespace NBookmark
 	};
 }
 
+typedef boost::variant<CBookmarkFolder, CBookmark> VariantBookmark;
+
 class CBookmarkFolder
 {
 public:
@@ -44,15 +50,17 @@ public:
 	FILETIME		GetDateCreated() const;
 	FILETIME		GetDateModified() const;
 
+	bool			HasChildren() const;
+
 	/* Returns true if this folder has *at least*
 	one child folder. */
 	bool			HasChildFolder() const;
 
-	std::list<boost::variant<CBookmarkFolder,CBookmark>>::iterator	begin();
-	std::list<boost::variant<CBookmarkFolder,CBookmark>>::iterator	end();
+	std::list<VariantBookmark>::iterator	begin();
+	std::list<VariantBookmark>::iterator	end();
 
-	std::list<boost::variant<CBookmarkFolder,CBookmark>>::const_iterator	begin() const;
-	std::list<boost::variant<CBookmarkFolder,CBookmark>>::const_iterator	end() const;
+	std::list<VariantBookmark>::const_iterator	begin() const;
+	std::list<VariantBookmark>::const_iterator	end() const;
 
 	void			InsertBookmark(const CBookmark &Bookmark);
 	void			InsertBookmark(const CBookmark &Bookmark,std::size_t Position);
@@ -95,14 +103,16 @@ private:
 	the ordering within this list defines the ordering
 	between child items (i.e. there is no explicit
 	ordering). */
-	std::list<boost::variant<CBookmarkFolder,CBookmark>>	m_ChildList;
+	std::list<VariantBookmark>	m_ChildList;
 };
 
 class CBookmark
 {
 public:
 
-	CBookmark(const std::wstring &strName,const std::wstring &strLocation,const std::wstring &strDescription);
+	static CBookmark Create(const std::wstring &strName, const std::wstring &strLocation, const std::wstring &strDescription);
+	static CBookmark UnserializeFromRegistry(const std::wstring &strKey);
+
 	~CBookmark();
 
 	void			SerializeToRegistry(const std::wstring &strKey);
@@ -126,6 +136,11 @@ public:
 	FILETIME		GetDateModified() const;
 
 private:
+
+	CBookmark(const std::wstring &strKey);
+	CBookmark(const std::wstring &strName, const std::wstring &strLocation, const std::wstring &strDescription);
+
+	void			InitializeFromRegistry(const std::wstring &strKey);
 
 	void			UpdateModificationTime();
 

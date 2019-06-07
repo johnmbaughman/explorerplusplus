@@ -1,5 +1,10 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include <boost/optional.hpp>
 #include <list>
 #include <vector>
 
@@ -93,7 +98,7 @@ struct ContextMenuHandler_t
 void			DecodePath(const TCHAR *szInitialPath,const TCHAR *szCurrentDirectory,TCHAR *szParsingPath,size_t cchDest);
 HRESULT			GetIdlFromParsingName(const TCHAR *szParsingName,LPITEMIDLIST *pidl);
 HRESULT			GetDisplayName(const TCHAR *szParsingPath,TCHAR *szDisplayName,UINT cchMax,DWORD uFlags);
-HRESULT			GetDisplayName(LPCITEMIDLIST pidlDirectory,TCHAR *szDisplayName,UINT cchMax,DWORD uFlags);
+HRESULT			GetDisplayName(LPCITEMIDLIST pidl,TCHAR *szDisplayName,UINT cchMax,DWORD uFlags);
 HRESULT			GetCsidlDisplayName(int csidl, TCHAR *szFolderName, UINT cchMax, DWORD uParsingFlags);
 BOOL			CheckIdl(LPCITEMIDLIST pidl);
 BOOL			IsIdlDirectory(LPCITEMIDLIST pidl);
@@ -109,6 +114,7 @@ HRESULT			ConvertVariantToString(const VARIANT *vt, TCHAR *szDetail, size_t cchM
 HRESULT			ConvertVariantStringArrayToString(SAFEARRAY *array, TCHAR *szDetail, size_t cchMax);
 HRESULT			ConvertGenericVariantToString(const VARIANT *vt, TCHAR *szDetail, size_t cchMax);
 HRESULT			ConvertDateVariantToString(DATE date, TCHAR *szDetail, size_t cchMax, BOOL friendlyDate);
+boost::optional<std::wstring>	GetFolderPathForDisplay(LPCITEMIDLIST pidl);
 BOOL			IsPathGUID(const TCHAR *szPath);
 BOOL			CompareIdls(LPCITEMIDLIST pidl1,LPCITEMIDLIST pidl2);
 HRESULT			AddJumpListTasks(const std::list<JumpListTaskInformation> &TaskList);
@@ -120,7 +126,10 @@ BOOL			ExecuteFileAction(HWND hwnd, const TCHAR *szVerb, const TCHAR *szParamete
 BOOL			ExecuteAndShowCurrentProcess(HWND hwnd, const TCHAR *szParameters);
 BOOL			ExecuteAndShowProcess(HWND hwnd, const TCHAR *szProcess, const TCHAR *szParameters);
 HRESULT			DecodeFriendlyPath(const TCHAR *szFriendlyPath,TCHAR *szParsingPath,UINT cchMax);
+HRESULT			ShowMultipleFileProperties(LPITEMIDLIST pidlDirectory, LPCITEMIDLIST *ppidl, HWND hwndOwner, int nFiles);
 HRESULT			ExecuteActionFromContextMenu(LPITEMIDLIST pidlDirectory, LPCITEMIDLIST *ppidl, HWND hwndOwner, int nFiles, const TCHAR *szAction, DWORD fMask);
+BOOL			CompareVirtualFolders(const TCHAR *szDirectory, UINT uFolderCSIDL);
+bool			IsChildOfLibrariesFolder(PIDLIST_ABSOLUTE pidl);
 
 /* Drag and drop helpers. */
 DWORD			DetermineDragEffect(DWORD grfKeyState, DWORD dwCurrentEffect, BOOL bDataAccept, BOOL bOnSameDrive);

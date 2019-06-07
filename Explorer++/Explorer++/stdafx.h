@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 // stdafx.h : include file for standard system include files,
 // or project specific include files that are used frequently, but
 // are changed infrequently
@@ -63,6 +67,7 @@
 #include <sstream>
 #pragma warning(pop)
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <memory>
+#include <vector>

@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: FileContextMenuManager.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Manages the file context menu.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <vector>
@@ -33,7 +24,7 @@ m_pShellContext(NULL)
 	IContextMenu *pContextMenu = NULL;
 	HRESULT hr;
 
-	for each(auto pidl in pidlItemList)
+	for(auto pidl : pidlItemList)
 	{
 		m_pidlItemList.push_back(ILClone(pidl));
 	}
@@ -100,7 +91,7 @@ m_pShellContext(NULL)
 
 CFileContextMenuManager::~CFileContextMenuManager()
 {
-	for each(auto pidl in m_pidlItemList)
+	for(auto pidl : m_pidlItemList)
 	{
 		CoTaskMemFree(pidl);
 	}

@@ -1,22 +1,18 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: UpdateCheckDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * This dialog performs an update check (i.e. it checks
  * whether a new version is available). Note that this
  * dialog does not actually download a new version if
  * one is available; it simply links to it.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
-#include <stdexcept>
-#include <vector>
+#include "UpdateCheckDialog.h"
+#include "MainResource.h"
+#include "Version.h"
 #include <boost\algorithm\string.hpp>
 
 #pragma warning(push)
@@ -24,9 +20,8 @@
 #include <boost\lexical_cast.hpp>
 #pragma warning(pop)
 
-#include "UpdateCheckDialog.h"
-#include "MainResource.h"
-#include "Version.h"
+#include <stdexcept>
+#include <vector>
 
 
 const TCHAR CUpdateCheckDialogPersistentSettings::SETTINGS_KEY[] = _T("UpdateCheck");

@@ -1,31 +1,28 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: Initialization.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Includes miscellaneous functions related to
- * the top-level GUI component.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
-#include <map>
 #include "Explorer++.h"
-#include "MainImages.h"
-#include "CustomizeColorsDialog.h"
 #include "BookmarkHelper.h"
+#include "Config.h"
+#include "CustomizeColorsDialog.h"
+#include "Explorer++_internal.h"
+#include "LoadSaveInterface.h"
+#include "MainImages.h"
+#include "MainResource.h"
+#include "MainWindow.h"
+#include "ResourceHelper.h"
+#include "ShellBrowser/ViewModes.h"
+#include "TaskbarThumbnails.h"
 #include "../DisplayWindow/DisplayWindow.h"
+#include "../Helper/Controls.h"
 #include "../Helper/FileOperations.h"
 #include "../Helper/Helper.h"
-#include "../Helper/Controls.h"
-#include "../Helper/ImageHelper.h"
+#include "../Helper/iDirectoryMonitor.h"
 #include "../Helper/Macros.h"
-#include "MainResource.h"
+#include <list>
+#include <map>
 
 
 DWORD WINAPI WorkerThreadProc(LPVOID pParam);
@@ -66,11 +63,6 @@ const std::map<UINT, int> MAIN_MENU_IMAGE_MAPPINGS = {
 	{ IDM_TOOLS_OPTIONS, SHELLIMAGES_OPTIONS },
 
 	{ IDM_HELP_HELP, SHELLIMAGES_HELP }
-};
-
-const std::map<UINT, int> TAB_RIGHT_CLICK_MENU_IMAGE_MAPPINGS = {
-	{ IDM_FILE_NEWTAB, SHELLIMAGES_NEWTAB },
-	{ IDM_TAB_REFRESH, SHELLIMAGES_REFRESH }
 };
 
 DWORD WINAPI WorkerThreadProc(LPVOID pParam)
@@ -124,43 +116,33 @@ void CALLBACK InitializeCOMAPC(ULONG_PTR dwParam)
 */
 void Explorerplusplus::OnCreate(void)
 {
+	InitializeMainToolbars();
+	InitializeBookmarks();
+
 	ILoadSave *pLoadSave = NULL;
-
-	InitializeTaskbarThumbnails();
-
 	LoadAllSettings(&pLoadSave);
 	ApplyToolbarSettings();
 
-	InitializeBookmarks();
+	m_mainWindow = MainWindow::Create(m_hContainer, m_config, m_hLanguageModule, this, this);
 
-	m_hIconThread = CreateWorkerThread();
 	m_hTreeViewIconThread = CreateWorkerThread();
-	m_hFolderSizeThread = CreateWorkerThread();
 
 	/* These need to occur after the language module
 	has been initialized, but before the tabs are
 	restored. */
-	SetMenu(m_hContainer, LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_MAINMENU)));
+	HMENU mainMenu = LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_MAINMENU));
+
+	if (!g_enablePlugins)
+	{
+		DeleteMenu(mainMenu, IDM_TOOLS_RUNSCRIPT, MF_BYCOMMAND);
+	}
+
+	SetMenu(m_hContainer, mainMenu);
+
 	m_hArrangeSubMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_ARRANGEMENU)), 0);
 	m_hArrangeSubMenuRClick = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_ARRANGEMENU)), 0);
 	m_hGroupBySubMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_GROUPBY_MENU)), 0);
 	m_hGroupBySubMenuRClick = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_GROUPBY_MENU)), 0);
-	m_hTabRightClickMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_TAB_RCLICK)), 0);
-	m_hToolbarRightClickMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_TOOLBAR_MENU)), 0);
-	m_hViewsMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_VIEWS_MENU)), 0);
-
-	HBITMAP hb;
-
-	/* Large and small image lists for the main toolbar. */
-	m_himlToolbarSmall = ImageList_Create(TOOLBAR_IMAGE_SIZE_SMALL_X, TOOLBAR_IMAGE_SIZE_SMALL_Y, ILC_COLOR32 | ILC_MASK, 0, 47);
-	hb = LoadBitmap(GetModuleHandle(0), MAKEINTRESOURCE(IDB_SHELLIMAGES));
-	ImageList_Add(m_himlToolbarSmall, hb, NULL);
-	DeleteObject(hb);
-
-	m_himlToolbarLarge = ImageList_Create(TOOLBAR_IMAGE_SIZE_LARGE_X, TOOLBAR_IMAGE_SIZE_LARGE_Y, ILC_COLOR32 | ILC_MASK, 0, 47);
-	hb = LoadBitmap(GetModuleHandle(0), MAKEINTRESOURCE(IDB_SHELLIMAGES_LARGE));
-	ImageList_Add(m_himlToolbarLarge, hb, NULL);
-	DeleteObject(hb);
 
 	CreateDirectoryMonitor(&m_pDirMon);
 
@@ -190,22 +172,13 @@ void Explorerplusplus::OnCreate(void)
 	of Windows. */
 	if(!IsWindows7OrGreater())
 	{
-		m_bShowTaskbarThumbnails = FALSE;
+		m_config->showTaskbarThumbnails = FALSE;
 	}
 
-	/* The internal variable that controls whether or not
-	taskbar thumbnails are shown in Windows 7 should only
-	be set once during execution (i.e. when Explorer++
-	starts up).
-	Therefore, we'll only ever show the user a provisional
-	setting, to stop them from changing the actual value. */
-	m_bShowTaskbarThumbnailsProvisional = m_bShowTaskbarThumbnails;
+	m_taskbarThumbnails = TaskbarThumbnails::Create(this, m_tabContainer, this, m_hLanguageModule, m_config);
 
 	RestoreTabs(pLoadSave);
 	delete pLoadSave;
-
-
-
 
 	SHChangeNotifyEntry shcne;
 
@@ -218,10 +191,6 @@ void Explorerplusplus::OnCreate(void)
 	m_SHChangeNotifyID = SHChangeNotifyRegister(m_hContainer, SHCNRF_ShellLevel,
 		SHCNE_ASSOCCHANGED, WM_APP_ASSOCCHANGED, 1, &shcne);
 
-
-
-
-	/* Mark the main menus as owner drawn. */
 	InitializeMenus();
 
 	InitializeArrangeMenuItems();
@@ -232,6 +201,12 @@ void Explorerplusplus::OnCreate(void)
 	m_hNextClipboardViewer = SetClipboardViewer(m_hContainer);
 
 	SetFocus(m_hActiveListView);
+
+	m_uiTheming = std::make_unique<UiTheming>(this, m_tabContainer, this);
+
+	InitializePlugins();
+
+	SetTimer(m_hContainer, AUTOSAVE_TIMER_ID, AUTOSAVE_TIMEOUT, nullptr);
 
 	m_InitializationFinished = true;
 }
@@ -293,29 +268,12 @@ void Explorerplusplus::InitializeMenus(void)
 {
 	HMENU hMenu = GetMenu(m_hContainer);
 
-	/* Insert the view mode (icons, small icons, details, etc) menus in. */
-	MENUITEMINFO mii;
-	TCHAR szText[64];
-
-	for (UINT viewMode : m_ViewModes)
-	{
-		LoadString(m_hLanguageModule,GetViewModeMenuStringId(viewMode),
-			szText,SIZEOF_ARRAY(szText));
-
-		mii.cbSize		= sizeof(mii);
-		mii.fMask		= MIIM_ID|MIIM_STRING;
-		mii.wID			= GetViewModeMenuId(viewMode);
-		mii.dwTypeData	= szText;
-		InsertMenuItem(hMenu,IDM_VIEW_PLACEHOLDER,FALSE,&mii);
-
-		InsertMenuItem(m_hViewsMenu,IDM_VIEW_PLACEHOLDER,FALSE,&mii);
-	}
+	AddViewModesToMenu(hMenu);
 
 	/* Delete the placeholder menu. */
 	DeleteMenu(hMenu,IDM_VIEW_PLACEHOLDER,MF_BYCOMMAND);
-	DeleteMenu(m_hViewsMenu,IDM_VIEW_PLACEHOLDER,MF_BYCOMMAND);
 
-	SetMenuImages();
+	SetMainMenuImages();
 
 	SetGoMenuName(hMenu,IDM_GO_MYCOMPUTER,CSIDL_DRIVES);
 	SetGoMenuName(hMenu,IDM_GO_MYDOCUMENTS,CSIDL_PERSONAL);
@@ -330,25 +288,11 @@ void Explorerplusplus::InitializeMenus(void)
 	SetGoMenuName(hMenu,IDM_GO_NETWORKCONNECTIONS,CSIDL_CONNECTIONS);
 }
 
-void Explorerplusplus::SetMenuImages()
+void Explorerplusplus::SetMainMenuImages()
 {
-	HImageListPtr imageList = HImageListPtr(ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 0, 48));
+	HImageListPtr imageList = GetShellImageList();
 
 	if (!imageList)
-	{
-		return;
-	}
-
-	HBitmapPtr bitmap = HBitmapPtr(static_cast<HBITMAP>(LoadImage(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDB_SHELLIMAGES), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION)));
-
-	if (!bitmap)
-	{
-		return;
-	}
-
-	int res = ImageList_Add(imageList.get(), bitmap.get(), nullptr);
-
-	if (res == -1)
 	{
 		return;
 	}
@@ -359,52 +303,32 @@ void Explorerplusplus::SetMenuImages()
 	{
 		SetMenuItemImageFromImageList(mainMenu, mapping.first, imageList.get(), mapping.second, m_menuImages);
 	}
-
-	for (auto mapping : TAB_RIGHT_CLICK_MENU_IMAGE_MAPPINGS)
-	{
-		SetMenuItemImageFromImageList(m_hTabRightClickMenu, mapping.first, imageList.get(), mapping.second, m_menuImages);
-	}
 }
 
-void Explorerplusplus::SetMenuItemImageFromImageList(HMENU menu, UINT menuItemId, HIMAGELIST imageList, int bitmapIndex, std::vector<HBitmapPtr> &menuImages)
+HMENU Explorerplusplus::BuildViewsMenu()
 {
-	HIconPtr icon = HIconPtr(ImageList_GetIcon(imageList, bitmapIndex, ILD_NORMAL));
+	HMENU viewsMenu = GetSubMenu(LoadMenu(m_hLanguageModule, MAKEINTRESOURCE(IDR_VIEWS_MENU)), 0);
+	AddViewModesToMenu(viewsMenu);
+	DeleteMenu(viewsMenu, IDM_VIEW_PLACEHOLDER, MF_BYCOMMAND);
 
-	if (!icon)
-	{
-		return;
-	}
+	return viewsMenu;
+}
 
-	HBitmapPtr bitmapPARGB32 = HBitmapPtr(ImageHelper::IconToBitmapPARGB32(icon.get(), 16, 16));
-
-	if (!bitmapPARGB32)
-	{
-		return;
-	}
-
+void Explorerplusplus::AddViewModesToMenu(HMENU menu)
+{
+	/* Insert the view mode (icons, small icons, details, etc) menus in. */
 	MENUITEMINFO mii;
-	mii.cbSize = sizeof(mii);
-	mii.fMask = MIIM_BITMAP;
-	mii.hbmpItem = bitmapPARGB32.get();
-	BOOL res = SetMenuItemInfo(menu, menuItemId, FALSE, &mii);
+	TCHAR szText[64];
 
-	if (res)
+	for (auto viewMode : m_viewModes)
 	{
-		/* The bitmap needs to live
-		for as long as the menu
-		does. It's up to the caller
-		to ensure that the bitmap
-		is destroyed at the appropriate
-		time. */
-		menuImages.push_back(std::move(bitmapPARGB32));
-	}
-}
+		LoadString(m_hLanguageModule, GetViewModeMenuStringId(viewMode),
+			szText, SIZEOF_ARRAY(szText));
 
-void Explorerplusplus::SetDefaultTabSettings(TabInfo_t *pTabInfo)
-{
-	pTabInfo->bLocked			= FALSE;
-	pTabInfo->bAddressLocked	= FALSE;
-	pTabInfo->bUseCustomName	= FALSE;
-	StringCchCopy(pTabInfo->szName,
-		SIZEOF_ARRAY(pTabInfo->szName),EMPTY_STRING);
+		mii.cbSize = sizeof(mii);
+		mii.fMask = MIIM_ID | MIIM_STRING;
+		mii.wID = GetViewModeMenuId(viewMode);
+		mii.dwTypeData = szText;
+		InsertMenuItem(menu, IDM_VIEW_PLACEHOLDER, FALSE, &mii);
+	}
 }

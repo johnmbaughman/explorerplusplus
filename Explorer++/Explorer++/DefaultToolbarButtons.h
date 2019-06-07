@@ -1,6 +1,16 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include "Explorer++_internal.h"
+#include "ToolbarButtons.h"
+
+struct ToolbarButton_t
+{
+	int iItemID;
+};
 
 const ToolbarButton_t DEFAULT_TOOLBAR_BUTTONS[] =
 {

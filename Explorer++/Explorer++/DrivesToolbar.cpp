@@ -1,38 +1,30 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: DrivesToolbarHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles all messages associated with the drives toolbar.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
 #include "DrivesToolbar.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
+#include "../Helper/Controls.h"
 #include "../Helper/DriveInfo.h"
 #include "../Helper/FileContextMenuManager.h"
-#include "../Helper/ShellHelper.h"
-#include "../Helper/Controls.h"
 #include "../Helper/Macros.h"
+#include "../Helper/ShellHelper.h"
 
 
-CDrivesToolbar *CDrivesToolbar::Create(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp)
+CDrivesToolbar *CDrivesToolbar::Create(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp, TabContainerInterface *tabContainer)
 {
-	return new CDrivesToolbar(hParent, uIDStart, uIDEnd, hInstance, pexpp);
+	return new CDrivesToolbar(hParent, uIDStart, uIDEnd, hInstance, pexpp, tabContainer);
 }
 
-CDrivesToolbar::CDrivesToolbar(HWND hParent,UINT uIDStart,UINT uIDEnd,HINSTANCE hInstance,IExplorerplusplus *pexpp) :
+CDrivesToolbar::CDrivesToolbar(HWND hParent,UINT uIDStart,UINT uIDEnd,HINSTANCE hInstance,IExplorerplusplus *pexpp,TabContainerInterface *tabContainer) :
 CBaseWindow(CreateDrivesToolbar(hParent)),
 m_uIDStart(uIDStart),
 m_uIDEnd(uIDEnd),
 m_hInstance(hInstance),
 m_pexpp(pexpp),
+m_tabContainer(tabContainer),
 m_IDCounter(0)
 {
 	Initialize(hParent);
@@ -85,7 +77,7 @@ INT_PTR CDrivesToolbar::OnMButtonUp(const POINTS *pts)
 		auto itr = m_mapID.find(static_cast<IDCounter>(static_cast<UINT>(tbButton.dwData)));
 		assert(itr != m_mapID.end());
 
-		m_pexpp->BrowseFolder(itr->second.c_str(), SBSP_ABSOLUTE, TRUE, TRUE, FALSE);
+		m_tabContainer->CreateNewTab(itr->second.c_str(), TabSettings(_selected = true));
 	}
 
 	return 0;
@@ -173,7 +165,7 @@ LRESULT CALLBACK CDrivesToolbar::DrivesToolbarParentProc(HWND hwnd,UINT uMsg,WPA
 			if(iIndex != -1)
 			{
 				std::wstring Path = GetDrivePath(iIndex);
-				m_pexpp->BrowseFolder(Path.c_str(),SBSP_ABSOLUTE,FALSE,FALSE,FALSE);
+				m_tabContainer->BrowseFolderInCurrentTab(Path.c_str(),SBSP_ABSOLUTE);
 			}
 
 			return 0;
@@ -246,12 +238,12 @@ void CDrivesToolbar::InsertDrives()
 {
 	DWORD dwSize = GetLogicalDriveStrings(0,NULL);
 
-	TCHAR *pDriveStrings = new TCHAR[dwSize];
-	dwSize = GetLogicalDriveStrings(dwSize,pDriveStrings);
+	auto driveStrings = std::make_unique<TCHAR[]>(dwSize);
+	dwSize = GetLogicalDriveStrings(dwSize,driveStrings.get());
 
 	if(dwSize != 0)
 	{
-		TCHAR *pDrive = pDriveStrings;
+		TCHAR *pDrive = driveStrings.get();
 
 		while(*pDrive != '\0')
 		{
@@ -260,8 +252,6 @@ void CDrivesToolbar::InsertDrives()
 			pDrive += (lstrlen(pDrive) + 1);
 		}
 	}
-
-	delete[] pDriveStrings;
 }
 
 void CDrivesToolbar::InsertDrive(const std::wstring &DrivePath)
@@ -423,7 +413,7 @@ void CDrivesToolbar::HandleCustomMenuItem(LPCITEMIDLIST pidlParent,
 	switch(iCmd)
 	{
 	case MENU_ID_OPEN_IN_NEW_TAB:
-		m_pexpp->BrowseFolder(pidlParent,SBSP_ABSOLUTE,TRUE,TRUE,FALSE);
+		m_tabContainer->CreateNewTab(pidlParent, TabSettings(_selected = true));
 		break;
 	}
 }

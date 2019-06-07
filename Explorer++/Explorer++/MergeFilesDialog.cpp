@@ -1,26 +1,21 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: MergeFiles.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides support for merging files.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <regex>
-#include "Explorer++_internal.h"
 #include "MergeFilesDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
+#include "../Helper/FileOperations.h"
 #include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
-#include "../Helper/FileOperations.h"
 #include "../Helper/Macros.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/StringHelper.h"
+#include <boost/scope_exit.hpp>
+#include <regex>
 
+#pragma warning(disable:4459) // declaration of 'boost_scope_exit_aux_args' hides global declaration
 
 namespace NMergeFilesDialog
 {
@@ -75,7 +70,7 @@ INT_PTR CMergeFilesDialog::OnInitDialog()
 
 	/* If the files all match the pattern .*[\\.]?part[0-9]+
 	(e.g. document.txt.part1), order them alphabetically. */
-	for each(auto strFullFilename in m_FullFilenameList)
+	for(const auto &strFullFilename : m_FullFilenameList)
 	{
 		if(!std::regex_match(strFullFilename,rxPattern))
 		{
@@ -148,7 +143,7 @@ INT_PTR CMergeFilesDialog::OnInitDialog()
 
 	int iItem = 0;
 
-	for each(auto strFullFilename in m_FullFilenameList)
+	for(const auto &strFullFilename : m_FullFilenameList)
 	{
 		TCHAR szFullFilename[MAX_PATH];
 
@@ -433,13 +428,27 @@ void CMergeFilesDialog::OnChangeOutputDirectory()
 	LoadString(GetInstance(),IDS_MERGE_SELECTDESTINATION,
 		szTitle,SIZEOF_ARRAY(szTitle));
 
-	std::wstring strOutputFilename;
-	BOOL bSucceeded = NFileOperations::CreateBrowseDialog(m_hDlg,szTitle,strOutputFilename);
+	LPITEMIDLIST pidl;
+	BOOL bSucceeded = NFileOperations::CreateBrowseDialog(m_hDlg,szTitle,&pidl);
 
-	if(bSucceeded)
+	if (!bSucceeded)
 	{
-		SetDlgItemText(m_hDlg,IDC_MERGE_EDIT_FILENAME,strOutputFilename.c_str());
+		return;
 	}
+
+	BOOST_SCOPE_EXIT(pidl) {
+		CoTaskMemFree(pidl);
+	} BOOST_SCOPE_EXIT_END
+
+	TCHAR parsingName[MAX_PATH];
+	HRESULT hr = GetDisplayName(pidl, parsingName, SIZEOF_ARRAY(parsingName), SHGDN_FORPARSING);
+
+	if (FAILED(hr))
+	{
+		return;
+	}
+
+	SetDlgItemText(m_hDlg, IDC_MERGE_EDIT_FILENAME, parsingName);
 }
 
 void CMergeFilesDialog::OnMove(bool bUp)
@@ -539,7 +548,7 @@ void CMergeFiles::StartMerging()
 	PostMessage(m_hDlg,NMergeFilesDialog::WM_APP_SETTOTALMERGECOUNT,
 		static_cast<WPARAM>(m_FullFilenameList.size()),0);
 
-	for each(auto strFullFilename in m_FullFilenameList)
+	for(const auto &strFullFilename : m_FullFilenameList)
 	{
 		if(bStop)
 		{
@@ -555,17 +564,15 @@ void CMergeFiles::StartMerging()
 
 			if(lMergeFileSize.QuadPart != 0)
 			{
-				char *pBuffer = new char[lMergeFileSize.LowPart];
+				auto buffer = std::make_unique<char[]>(lMergeFileSize.LowPart);
 
 				DWORD dwNumberOfBytesRead;
-				ReadFile(hInputFile,reinterpret_cast<LPVOID>(pBuffer),static_cast<DWORD>(lMergeFileSize.LowPart),
+				ReadFile(hInputFile,reinterpret_cast<LPVOID>(buffer.get()),static_cast<DWORD>(lMergeFileSize.LowPart),
 					&dwNumberOfBytesRead,NULL);
 
 				DWORD dwNumberOfBytesWritten;
-				WriteFile(hOutputFile,reinterpret_cast<LPCVOID>(pBuffer),dwNumberOfBytesRead,
+				WriteFile(hOutputFile,reinterpret_cast<LPCVOID>(buffer.get()),dwNumberOfBytesRead,
 					&dwNumberOfBytesWritten,NULL);
-
-				delete[] pBuffer;
 			}
 
 			CloseHandle(hInputFile);

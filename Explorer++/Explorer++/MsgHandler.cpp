@@ -1,28 +1,30 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: MsgHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles messages passed back from the main GUI components.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "AddressBar.h"
+#include "ColorRuleHelper.h"
+#include "Config.h"
 #include "Explorer++_internal.h"
+#include "LoadSaveRegistry.h"
+#include "LoadSaveXml.h"
 #include "MainResource.h"
-#include "../Helper/ShellHelper.h"
+#include "PluginManager.h"
+#include "ShellBrowser/ViewModes.h"
+#include "ToolbarButtons.h"
+#include "ViewModeHelper.h"
 #include "../Helper/Controls.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/ProcessHelper.h"
-#include "../Helper/WindowHelper.h"
-#include "../Helper/Macros.h"
+#include "../Helper/iDirectoryMonitor.h"
 #include "../Helper/Logging.h"
-
+#include "../Helper/Macros.h"
+#include "../Helper/ProcessHelper.h"
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/WindowHelper.h"
+#include "../MyTreeView/MyTreeView.h"
+#include <boost/range/adaptor/map.hpp>
 
 /* The treeview is offset by a small
 amount on the left. */
@@ -211,7 +213,7 @@ void Explorerplusplus::OpenItem(LPCITEMIDLIST pidlItem,BOOL bOpenInNewTab,BOOL b
 		if((uAttributes & SFGAO_FOLDER) && (uAttributes & SFGAO_STREAM))
 		{
 			/* Zip file. */
-			if(m_bHandleZipFiles)
+			if(m_config->handleZipFiles)
 			{
 				OpenFolderItem(pidlItem,bOpenInNewTab,bOpenInNewWindow);
 			}
@@ -253,7 +255,7 @@ void Explorerplusplus::OpenItem(LPCITEMIDLIST pidlItem,BOOL bOpenInNewTab,BOOL b
 				{
 					/* Is this a link to a folder or zip file? */
 					if(((uAttributes & SFGAO_FOLDER) && !(uAttributes & SFGAO_STREAM)) ||
-						((uAttributes & SFGAO_FOLDER) && (uAttributes & SFGAO_STREAM) && m_bHandleZipFiles))
+						((uAttributes & SFGAO_FOLDER) && (uAttributes & SFGAO_STREAM) && m_config->handleZipFiles))
 					{
 						LPITEMIDLIST	pidlTarget = NULL;
 
@@ -314,11 +316,11 @@ void Explorerplusplus::OpenItem(LPCITEMIDLIST pidlItem,BOOL bOpenInNewTab,BOOL b
 void Explorerplusplus::OpenFolderItem(LPCITEMIDLIST pidlItem,BOOL bOpenInNewTab,BOOL bOpenInNewWindow)
 {
 	if(bOpenInNewWindow)
-		BrowseFolder(pidlItem,SBSP_SAMEBROWSER,FALSE,FALSE,TRUE);
-	else if(m_bAlwaysOpenNewTab || bOpenInNewTab)
-		BrowseFolder(pidlItem,SBSP_SAMEBROWSER,TRUE,TRUE,FALSE);
+		OpenDirectoryInNewWindow(pidlItem);
+	else if(m_config->alwaysOpenNewTab || bOpenInNewTab)
+		CreateNewTab(pidlItem, TabSettings(_selected = true));
 	else
-		BrowseFolder(pidlItem,SBSP_SAMEBROWSER);
+		BrowseFolderInCurrentTab(pidlItem,0);
 }
 
 void Explorerplusplus::OpenFileItem(LPCITEMIDLIST pidlItem,const TCHAR *szParameters)
@@ -340,7 +342,6 @@ void Explorerplusplus::OpenFileItem(LPCITEMIDLIST pidlItem,const TCHAR *szParame
 BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 {
 	RECT			rc;
-	TCITEM			tcItem;
 	UINT			uFlags;
 	int				IndentBottom = 0;
 	int				IndentTop = 0;
@@ -351,8 +352,6 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 	int				iHolderTop;
 	int				iTabBackingWidth;
 	int				iTabBackingLeft;
-	int				nTabs;
-	int				i = 0;
 
 	if (!m_InitializationFinished)
 	{
@@ -365,18 +364,18 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 		iIndentRebar += GetRectHeight(&rc);
 	}
 
-	if(m_bShowStatusBar)
+	if(m_config->showStatusBar)
 	{
 		GetWindowRect(m_hStatusBar,&rc);
 		IndentBottom += GetRectHeight(&rc);
 	}
 
-	if(m_bShowDisplayWindow)
+	if(m_config->showDisplayWindow)
 	{
-		IndentBottom += m_DisplayWindowHeight;
+		IndentBottom += m_config->displayWindowHeight;
 	}
 
-	if(m_bShowFolders)
+	if(m_config->showFolders)
 	{
 		GetClientRect(m_hHolder,&rc);
 		IndentLeft = GetRectWidth(&rc);
@@ -386,7 +385,7 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 
 	if(m_bShowTabBar)
 	{
-		if(!m_bShowTabBarAtBottom)
+		if(!m_config->showTabBarAtBottom)
 		{
 			IndentTop += TAB_WINDOW_HEIGHT;
 		}
@@ -394,7 +393,7 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 
 	/* <---- Tab control + backing ----> */
 
-	if(m_bExtendTabControl)
+	if(m_config->extendTabControl)
 	{
 		iTabBackingLeft = 0;
 		iTabBackingWidth = MainWindowWidth;
@@ -409,7 +408,7 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 
 	int iTabTop;
 
-	if(!m_bShowTabBarAtBottom)
+	if(!m_config->showTabBarAtBottom)
 	{
 		iTabTop = iIndentRebar;
 	}
@@ -424,15 +423,15 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 		iTabTop,iTabBackingWidth,
 		TAB_WINDOW_HEIGHT,uFlags);
 
-	SetWindowPos(m_hTabCtrl,NULL,0,0,iTabBackingWidth - 25,
+	SetWindowPos(m_tabContainer->GetHWND(),NULL,0,0,iTabBackingWidth - 25,
 		TAB_WINDOW_HEIGHT,SWP_SHOWWINDOW|SWP_NOZORDER);
 
 	/* Tab close button. */
 	SetWindowPos(m_hTabWindowToolbar,NULL,iTabBackingWidth + TAB_TOOLBAR_X_OFFSET,
 	TAB_TOOLBAR_Y_OFFSET,TAB_TOOLBAR_WIDTH,TAB_TOOLBAR_HEIGHT,SWP_SHOWWINDOW|SWP_NOZORDER);
 
-	if(m_bExtendTabControl &&
-		!m_bShowTabBarAtBottom)
+	if(m_config->extendTabControl &&
+		!m_config->showTabBarAtBottom)
 	{
 		iHolderTop = IndentTop;
 	}
@@ -443,8 +442,8 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 
 	/* <---- Holder window + child windows ----> */
 
-	if(m_bExtendTabControl &&
-		m_bShowTabBarAtBottom &&
+	if(m_config->extendTabControl &&
+		m_config->showTabBarAtBottom &&
 		m_bShowTabBar)
 	{
 		iHolderHeight = MainWindowHeight - IndentBottom - iHolderTop - TAB_WINDOW_HEIGHT;
@@ -454,7 +453,7 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 		iHolderHeight = MainWindowHeight - IndentBottom - iHolderTop;
 	}
 
-	iHolderWidth = m_TreeViewWidth;
+	iHolderWidth = m_config->treeViewWidth;
 
 	SetWindowPos(m_hHolder,NULL,0,iHolderTop,
 		iHolderWidth,iHolderHeight,SWP_NOZORDER);
@@ -473,26 +472,23 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 	/* <---- Display window ----> */
 
 	SetWindowPos(m_hDisplayWindow,NULL,0,MainWindowHeight - IndentBottom,
-		MainWindowWidth,m_DisplayWindowHeight,SWP_SHOWWINDOW|SWP_NOZORDER);
+		MainWindowWidth, m_config->displayWindowHeight,SWP_SHOWWINDOW|SWP_NOZORDER);
 
 
 	/* <---- ALL listview windows ----> */
 
-	nTabs = TabCtrl_GetItemCount(m_hTabCtrl);
-
-	for(i = 0;i < nTabs;i++)
+	for (auto &tab : m_tabContainer->GetAllTabs() | boost::adaptors::map_values)
 	{
-		tcItem.mask = TCIF_PARAM;
-		TabCtrl_GetItem(m_hTabCtrl,i,&tcItem);
-
 		uFlags = SWP_NOZORDER;
 
-		if((int)tcItem.lParam == m_selectedTabId)
-			uFlags |= SWP_SHOWWINDOW;
-
-		if(!m_bShowTabBarAtBottom)
+		if (m_tabContainer->IsTabSelected(tab))
 		{
-			SetWindowPos(m_hListView.at((int)tcItem.lParam),NULL,IndentLeft,IndentTop,
+			uFlags |= SWP_SHOWWINDOW;
+		}
+
+		if(!m_config->showTabBarAtBottom)
+		{
+			SetWindowPos(tab.listView,NULL,IndentLeft,IndentTop,
 				MainWindowWidth - IndentLeft,MainWindowHeight - IndentBottom - IndentTop,
 				uFlags);
 		}
@@ -500,13 +496,13 @@ BOOL Explorerplusplus::OnSize(int MainWindowWidth,int MainWindowHeight)
 		{
 			if(m_bShowTabBar)
 			{
-				SetWindowPos(m_hListView.at((int)tcItem.lParam),NULL,IndentLeft,IndentTop,
+				SetWindowPos(tab.listView,NULL,IndentLeft,IndentTop,
 					MainWindowWidth - IndentLeft,MainWindowHeight - IndentBottom - IndentTop - TAB_WINDOW_HEIGHT,
 					uFlags);
 			}
 			else
 			{
-				SetWindowPos(m_hListView.at((int)tcItem.lParam),NULL,IndentLeft,IndentTop,
+				SetWindowPos(tab.listView,NULL,IndentLeft,IndentTop,
 					MainWindowWidth - IndentLeft,MainWindowHeight - IndentBottom - IndentTop,
 					uFlags);
 			}
@@ -548,11 +544,6 @@ int Explorerplusplus::OnDestroy(void)
 		SHChangeNotifyDeregister(m_SHChangeNotifyID);
 	}
 
-	QueueUserAPC(UninitializeCOMAPC,m_hIconThread,NULL);
-
-	ImageList_Destroy(m_himlToolbarSmall);
-	ImageList_Destroy(m_himlToolbarLarge);
-
 	delete m_pStatusBar;
 
 	ChangeClipboardChain(m_hContainer,m_hNextClipboardViewer);
@@ -563,7 +554,7 @@ int Explorerplusplus::OnDestroy(void)
 
 int Explorerplusplus::OnClose(void)
 {
-	if(m_bConfirmCloseTabs && (TabCtrl_GetItemCount(m_hTabCtrl) > 1))
+	if(m_config->confirmCloseTabs && (m_tabContainer->GetNumTabs() > 1))
 	{
 		TCHAR szTemp[128];
 		LoadString(m_hLanguageModule,IDS_GENERAL_CLOSE_ALL_TABS,szTemp,SIZEOF_ARRAY(szTemp));
@@ -575,13 +566,20 @@ int Explorerplusplus::OnClose(void)
 			return 1;
 	}
 
-	m_iLastSelectedTab = m_selectedTabIndex;
+	// It's important that the plugins are destroyed before the main
+	// window is destroyed and before this class is destroyed.
+	// The first because the API binding classes may interact with the
+	// UI on destruction (e.g. to remove menu entries they've added).
+	// The second because the API bindings assume they can use the
+	// objects passed to them until their destruction. Those objects are
+	// destroyed automatically when this class is destroyed, so letting
+	// the plugins be destroyed automatically could result in objects
+	// being destroyed in the wrong order.
+	m_pluginManager.reset();
 
-	m_bShowTaskbarThumbnails = m_bShowTaskbarThumbnailsProvisional;
+	KillTimer(m_hContainer, AUTOSAVE_TIMER_ID);
 
 	SaveAllSettings();
-
-	RevokeDragDrop(m_hTabCtrl);
 
 	DestroyWindow(m_hContainer);
 
@@ -605,13 +603,15 @@ void Explorerplusplus::OnDrawClipboard(void)
 		if(OleIsCurrentClipboard(m_pClipboardDataObject) == S_FALSE)
 		{
 			/* Deghost all items that have been 'cut'. */
-			for each(auto strFile in m_CutFileNameList)
+			for(const auto &strFile : m_CutFileNameList)
 			{
+				Tab *tab = m_tabContainer->GetTabOptional(m_iCutTabInternal);
+
 				/* Only deghost the items if the tab they
 				are/were in still exists. */
-				if(CheckTabIdStatus(m_iCutTabInternal))
+				if(tab)
 				{
-					int iItem = m_pShellBrowser[m_iCutTabInternal]->LocateFileItemIndex(strFile.c_str());
+					int iItem = tab->GetShellBrowser()->LocateFileItemIndex(strFile.c_str());
 
 					/* It is possible that the ghosted file
 					does NOT exist within the current folder.
@@ -619,7 +619,7 @@ void Explorerplusplus::OnDrawClipboard(void)
 					is cut, and the folder is changed, in which
 					case the item is no longer available. */
 					if(iItem != -1)
-						m_pShellBrowser[m_iCutTabInternal]->DeghostItem(iItem);
+						tab->GetShellBrowser()->DeghostItem(iItem);
 				}
 			}
 
@@ -644,7 +644,7 @@ void Explorerplusplus::OnDrawClipboard(void)
 		}
 	}
 
-	SendMessage(m_hMainToolbar,TB_ENABLEBUTTON,(WPARAM)TOOLBAR_PASTE,
+	SendMessage(m_mainToolbar->GetHWND(),TB_ENABLEBUTTON,(WPARAM)TOOLBAR_PASTE,
 		!m_pActiveShellBrowser->InVirtualFolder() && IsClipboardFormatAvailable(CF_HDROP));
 
 	if(m_hNextClipboardViewer != NULL)
@@ -672,17 +672,19 @@ void Explorerplusplus::HandleDirectoryMonitoring(int iTabId)
 	TCHAR				szDirectoryToWatch[MAX_PATH];
 	int					iDirMonitorId;
 
-	iDirMonitorId		= m_pShellBrowser[iTabId]->GetDirMonitorId();
+	Tab &tab = m_tabContainer->GetTab(iTabId);
+
+	iDirMonitorId		= tab.GetShellBrowser()->GetDirMonitorId();
 			
 	/* Stop monitoring the directory that was browsed from. */
 	m_pDirMon->StopDirectoryMonitor(iDirMonitorId);
 
-	m_pShellBrowser[iTabId]->QueryCurrentDirectory(SIZEOF_ARRAY(szDirectoryToWatch),
+	tab.GetShellBrowser()->QueryCurrentDirectory(SIZEOF_ARRAY(szDirectoryToWatch),
 		szDirectoryToWatch);
 
 	/* Don't watch virtual folders (the 'recycle bin' may be an
 	exception to this). */
-	if(m_pShellBrowser[iTabId]->InVirtualFolder())
+	if(tab.GetShellBrowser()->InVirtualFolder())
 	{
 		iDirMonitorId = -1;
 	}
@@ -691,7 +693,7 @@ void Explorerplusplus::HandleDirectoryMonitoring(int iTabId)
 		pDirectoryAltered = (DirectoryAltered_t *)malloc(sizeof(DirectoryAltered_t));
 
 		pDirectoryAltered->iIndex		= iTabId;
-		pDirectoryAltered->iFolderIndex	= m_pShellBrowser[iTabId]->GetFolderIndex();
+		pDirectoryAltered->iFolderIndex	= tab.GetShellBrowser()->GetFolderIndex();
 		pDirectoryAltered->pData		= this;
 
 		/* Start monitoring the directory that was opened. */
@@ -702,7 +704,7 @@ void Explorerplusplus::HandleDirectoryMonitoring(int iTabId)
 			FILE_NOTIFY_CHANGE_SECURITY,DirectoryAlteredCallback,FALSE,(void *)pDirectoryAltered);
 	}
 
-	m_pShellBrowser[iTabId]->SetDirMonitorId(iDirMonitorId);
+	tab.GetShellBrowser()->SetDirMonitorId(iDirMonitorId);
 }
 
 void Explorerplusplus::OnDisplayWindowResized(WPARAM wParam)
@@ -710,7 +712,7 @@ void Explorerplusplus::OnDisplayWindowResized(WPARAM wParam)
 	RECT	rc;
 
 	if((int)wParam >= MINIMUM_DISPLAYWINDOW_HEIGHT)
-		m_DisplayWindowHeight = (int)wParam;
+		m_config->displayWindowHeight = (int)wParam;
 
 	GetClientRect(m_hContainer,&rc);
 
@@ -742,57 +744,19 @@ void Explorerplusplus::OnToolbarViews(void)
 
 void Explorerplusplus::CycleViewState(BOOL bCycleForward)
 {
-	UINT uViewMode = m_pActiveShellBrowser->GetCurrentViewMode();
-
-	std::list<UINT>::iterator itr;
-
-	for(itr = m_ViewModes.begin();itr != m_ViewModes.end();itr++)
-	{
-		if(*itr == uViewMode)
-			break;
-	}
+	ViewMode viewMode = m_pActiveShellBrowser->GetViewMode();
+	ViewMode newViewMode;
 
 	if(bCycleForward)
 	{
-		std::list<UINT>::iterator itrEnd;
-
-		itrEnd = m_ViewModes.end();
-		itrEnd--;
-
-		if(itr == itrEnd)
-			itr = m_ViewModes.begin();
-		else
-			itr++;
+		newViewMode = GetNextViewMode(m_viewModes, viewMode);
 	}
 	else
 	{
-		if(itr == m_ViewModes.begin())
-		{
-			itr = m_ViewModes.end();
-			itr--;
-		}
-		else
-		{
-			itr--;
-		}
+		newViewMode = GetPreviousViewMode(m_viewModes, viewMode);
 	}
 
-	m_pActiveShellBrowser->SetCurrentViewMode(*itr);
-}
-
-void Explorerplusplus::ShowToolbarViewsDropdown(void)
-{
-	POINT	ptOrigin;
-	RECT	rcButton;
-
-	SendMessage(m_hMainToolbar,TB_GETRECT,(WPARAM)TOOLBAR_VIEWS,(LPARAM)&rcButton);
-
-	ptOrigin.x	= rcButton.left;
-	ptOrigin.y	= rcButton.bottom;
-
-	ClientToScreen(m_hMainToolbar,&ptOrigin);
-
-	CreateViewsMenu(&ptOrigin);
+	m_pActiveShellBrowser->SetViewMode(newViewMode);
 }
 
 void Explorerplusplus::OnSortByAscending(BOOL bSortAscending)
@@ -801,10 +765,10 @@ void Explorerplusplus::OnSortByAscending(BOOL bSortAscending)
 	{
 		m_pActiveShellBrowser->SetSortAscending(bSortAscending);
 
-		UINT SortMode = m_pActiveShellBrowser->GetSortMode();
+		SortMode sortMode = m_pActiveShellBrowser->GetSortMode();
 
 		/* It is quicker to re-sort the folder than refresh it. */
-		m_pActiveShellBrowser->SortFolder(SortMode);
+		m_pActiveShellBrowser->SortFolder(sortMode);
 	}
 }
 
@@ -821,23 +785,23 @@ void Explorerplusplus::OnPreviousWindow(void)
 
 		if(hFocus == m_hActiveListView)
 		{
-			if(m_bShowFolders)
+			if(m_config->showFolders)
 			{
 				SetFocus(m_hTreeView);
 			}
 			else
 			{
-				if(m_bShowAddressBar)
+				if(m_config->showAddressBar)
 				{
-					SetFocus(m_hAddressBar);
+					SetFocus(m_addressBar->GetHWND());
 				}
 			}
 		}
 		else if(hFocus == m_hTreeView)
 		{
-			if(m_bShowAddressBar)
+			if(m_config->showAddressBar)
 			{
-				SetFocus(m_hAddressBar);
+				SetFocus(m_addressBar->GetHWND());
 			}
 			else
 			{
@@ -845,7 +809,7 @@ void Explorerplusplus::OnPreviousWindow(void)
 				SetFocus(m_hActiveListView);
 			}
 		}
-		else if(hFocus == (HWND) SendMessage(m_hAddressBar, CBEM_GETEDITCONTROL, 0, 0))
+		else if(hFocus == (HWND) SendMessage(m_addressBar->GetHWND(), CBEM_GETEDITCONTROL, 0, 0))
 		{
 			/* Always shown. */
 			SetFocus(m_hActiveListView);
@@ -873,13 +837,13 @@ void Explorerplusplus::OnNextWindow(void)
 		window in the chain. */
 		if(hFocus == m_hActiveListView)
 		{
-			if(m_bShowAddressBar)
+			if(m_config->showAddressBar)
 			{
-				SetFocus(m_hAddressBar);
+				SetFocus(m_addressBar->GetHWND());
 			}
 			else
 			{
-				if(m_bShowFolders)
+				if(m_config->showFolders)
 				{
 					SetFocus(m_hTreeView);
 				}
@@ -890,9 +854,9 @@ void Explorerplusplus::OnNextWindow(void)
 			/* Always shown. */
 			SetFocus(m_hActiveListView);
 		}
-		else if(hFocus == (HWND)SendMessage(m_hAddressBar,CBEM_GETEDITCONTROL,0,0))
+		else if(hFocus == (HWND)SendMessage(m_addressBar->GetHWND(),CBEM_GETEDITCONTROL,0,0))
 		{
-			if(m_bShowFolders)
+			if(m_config->showFolders)
 			{
 				SetFocus(m_hTreeView);
 			}
@@ -937,7 +901,7 @@ void Explorerplusplus::OnLockToolbars(void)
 	UINT			nBands;
 	UINT			i = 0;
 
-	m_bLockToolbars = !m_bLockToolbars;
+	m_config->lockToolbars = !m_config->lockToolbars;
 
 	nBands = (UINT)SendMessage(m_hMainRebar,RB_GETBANDCOUNT,0,0);
 
@@ -949,7 +913,7 @@ void Explorerplusplus::OnLockToolbars(void)
 		SendMessage(m_hMainRebar,RB_GETBANDINFO,i,(LPARAM)&rbbi);
 
 		/* Add the gripper style. */
-		AddGripperStyle(&rbbi.fStyle,!m_bLockToolbars);
+		AddGripperStyle(&rbbi.fStyle,!m_config->lockToolbars);
 
 		/* Now, set the new style. */
 		SendMessage(m_hMainRebar,RB_SETBANDINFO,i,(LPARAM)&rbbi);
@@ -957,7 +921,7 @@ void Explorerplusplus::OnLockToolbars(void)
 
 	/* If the rebar is locked, prevent items from
 	been rearranged. */
-	AddWindowStyle(m_hMainRebar,RBS_FIXEDORDER,m_bLockToolbars);
+	AddWindowStyle(m_hMainRebar,RBS_FIXEDORDER, m_config->lockToolbars);
 }
 
 void Explorerplusplus::OnShellNewItemCreated(LPARAM lParam)
@@ -992,7 +956,7 @@ void Explorerplusplus::OnAppCommand(UINT cmd)
 		break;
 
 	case APPCOMMAND_BROWSER_HOME:
-		OnHome();
+		OnNavigateHome();
 		break;
 
 	case APPCOMMAND_BROWSER_FAVORITES:
@@ -1042,7 +1006,8 @@ void Explorerplusplus::OnAppCommand(UINT cmd)
 
 void Explorerplusplus::OnRefresh(void)
 {
-	RefreshTab(m_selectedTabId);
+	Tab &tab = m_tabContainer->GetSelectedTab();
+	RefreshTab(tab);
 }
 
 void Explorerplusplus::CopyColumnInfoToClipboard(void)
@@ -1053,7 +1018,7 @@ void Explorerplusplus::CopyColumnInfoToClipboard(void)
 	std::wstring strColumnInfo;
 	int nActiveColumns = 0;
 
-	for each(auto Column in Columns)
+	for(const auto &Column : Columns)
 	{
 		if(Column.bChecked)
 		{
@@ -1095,7 +1060,7 @@ void Explorerplusplus::CopyColumnInfoToClipboard(void)
 	CopyTextToClipboard(strColumnInfo);
 }
 
-void Explorerplusplus::SetFilterStatus(void)
+void Explorerplusplus::ToggleFilterStatus()
 {
 	m_pActiveShellBrowser->SetFilterStatus(!m_pActiveShellBrowser->GetFilterStatus());
 }
@@ -1186,10 +1151,10 @@ void Explorerplusplus::OnIdaRClick(void)
 
 				ClientToScreen(m_hActiveListView,&ptItem);
 
-				uViewMode = m_pActiveShellBrowser->GetCurrentViewMode();
+				uViewMode = m_pActiveShellBrowser->GetViewMode();
 
-				if(uViewMode == VM_SMALLICONS || uViewMode == VM_LIST ||
-					uViewMode == VM_DETAILS)
+				if(uViewMode == ViewMode::SmallIcons || uViewMode == ViewMode::List ||
+					uViewMode == ViewMode::Details)
 					himl = ListView_GetImageList(m_hActiveListView,LVSIL_SMALL);
 				else
 					himl = ListView_GetImageList(m_hActiveListView,LVSIL_NORMAL);
@@ -1253,15 +1218,11 @@ void Explorerplusplus::OnAssocChanged(void)
 	typedef BOOL (WINAPI *FII_PROC)(BOOL);
 	FII_PROC FileIconInit;
 	HKEY hKey;
-	TCITEM tcItem;
 	HMODULE hShell32;
 	TCHAR szShellIconSize[32];
 	TCHAR szTemp[32];
 	DWORD dwShellIconSize;
 	LONG res;
-	int i = 0;
-	int nTabs;
-	int iIndex;
 
 	hShell32 = LoadLibrary(_T("shell32.dll"));
 
@@ -1297,28 +1258,20 @@ void Explorerplusplus::OnAssocChanged(void)
 	/* DO NOT free shell32.dll. Doing so will release
 	the image lists (among other things). */
 
-	nTabs = TabCtrl_GetItemCount(m_hTabCtrl);
-
 	/* When the system image list is refresh, ALL previous
 	icons will be discarded. This means that SHGetFileInfo()
 	needs to be called to get each files icon again. */
 
 	/* Now, go through each tab, and refresh each icon. */
-	for(i = 0;i < nTabs;i++)
+	for (auto &tab : m_tabContainer->GetAllTabs() | boost::adaptors::map_values)
 	{
-		tcItem.mask = TCIF_PARAM;
-		TabCtrl_GetItem(m_hTabCtrl,i,&tcItem);
-
-		iIndex = (int)tcItem.lParam;
-
-		m_pShellBrowser[iIndex]->RefreshAllIcons();
+		tab.GetShellBrowser()->Refresh();
 	}
 
 	/* Now, refresh the treeview. */
 	m_pMyTreeView->RefreshAllIcons();
 
-	/* Address bar. */
-	UpdateAddressBarText();
+	/* TODO: Update the address bar. */
 }
 
 void Explorerplusplus::OnCloneWindow(void)
@@ -1418,7 +1371,7 @@ LRESULT Explorerplusplus::OnCustomDraw(LPARAM lParam)
 
 				/* Loop through each filter. Decide whether to change the font of the
 				current item based on its filename and/or attributes. */
-				for each(auto ColorRule in m_ColorRules)
+				for(const auto &ColorRule : m_ColorRules)
 				{
 					BOOL bMatchFileName = FALSE;
 					BOOL bMatchAttributes = FALSE;
@@ -1464,125 +1417,47 @@ LRESULT Explorerplusplus::OnCustomDraw(LPARAM lParam)
 	return 0;
 }
 
-int Explorerplusplus::GetViewModeMenuId(UINT uViewMode)
+void Explorerplusplus::OnSortBy(SortMode sortMode)
 {
-	switch(uViewMode)
+	SortMode currentSortMode = m_pActiveShellBrowser->GetSortMode();
+
+	if(!m_pActiveShellBrowser->GetShowInGroups() &&
+		sortMode == currentSortMode)
 	{
-		case VM_THUMBNAILS:
-			return IDM_VIEW_THUMBNAILS;
-			break;
-
-		case VM_TILES:
-			return IDM_VIEW_TILES;
-			break;
-
-		case VM_EXTRALARGEICONS:
-			return IDM_VIEW_EXTRALARGEICONS;
-			break;
-
-		case VM_LARGEICONS:
-			return IDM_VIEW_LARGEICONS;
-			break;
-
-		case VM_ICONS:
-			return IDM_VIEW_ICONS;
-			break;
-
-		case VM_SMALLICONS:
-			return IDM_VIEW_SMALLICONS;
-			break;
-
-		case VM_LIST:
-			return IDM_VIEW_LIST;
-			break;
-
-		case VM_DETAILS:
-			return IDM_VIEW_DETAILS;
-			break;
+		m_pActiveShellBrowser->SetSortAscending(!m_pActiveShellBrowser->GetSortAscending());
+	}
+	else if(m_pActiveShellBrowser->GetShowInGroups())
+	{
+		m_pActiveShellBrowser->SetShowInGroups(FALSE);
 	}
 
-	return -1;
+	m_pActiveShellBrowser->SortFolder(sortMode);
 }
 
-int Explorerplusplus::GetViewModeMenuStringId(UINT uViewMode)
+void Explorerplusplus::OnGroupBy(SortMode sortMode)
 {
-	switch(uViewMode)
-	{
-		case VM_THUMBNAILS:
-			return IDS_VIEW_THUMBNAILS;
-			break;
-
-		case VM_TILES:
-			return IDS_VIEW_TILES;
-			break;
-
-		case VM_EXTRALARGEICONS:
-			return IDS_VIEW_EXTRALARGEICONS;
-			break;
-
-		case VM_LARGEICONS:
-			return IDS_VIEW_LARGEICONS;
-			break;
-
-		case VM_ICONS:
-			return IDS_VIEW_MEDIUMICONS;
-			break;
-
-		case VM_SMALLICONS:
-			return IDS_VIEW_SMALLICONS;
-			break;
-
-		case VM_LIST:
-			return IDS_VIEW_LIST;
-			break;
-
-		case VM_DETAILS:
-			return IDS_VIEW_DETAILS;
-			break;
-	}
-
-	return -1;
-}
-
-void Explorerplusplus::OnSortBy(UINT uSortMode)
-{
-	UINT uCurrentSortMode = m_pActiveShellBrowser->GetSortMode();
-
-	if(!m_pActiveShellBrowser->IsGroupViewEnabled() &&
-		uSortMode == uCurrentSortMode)
-	{
-		m_pActiveShellBrowser->ToggleSortAscending();
-	}
-	else if(m_pActiveShellBrowser->IsGroupViewEnabled())
-	{
-		m_pActiveShellBrowser->SetGrouping(FALSE);
-	}
-
-	m_pActiveShellBrowser->SortFolder(uSortMode);
-}
-
-void Explorerplusplus::OnGroupBy(UINT uSortMode)
-{
-	UINT uCurrentSortMode = m_pActiveShellBrowser->GetSortMode();
+	SortMode currentSortMode = m_pActiveShellBrowser->GetSortMode();
 
 	/* If group view is already enabled, and the current sort
 	mode matches the supplied sort mode, toggle the ascending/
 	descending flag. */
-	if(m_pActiveShellBrowser->IsGroupViewEnabled() &&
-		uSortMode == uCurrentSortMode)
+	if(m_pActiveShellBrowser->GetShowInGroups() &&
+		sortMode == currentSortMode)
 	{
-		m_pActiveShellBrowser->ToggleSortAscending();
+		m_pActiveShellBrowser->SetSortAscending(!m_pActiveShellBrowser->GetSortAscending());
 	}
-	else if(!m_pActiveShellBrowser->IsGroupViewEnabled())
+	else if(!m_pActiveShellBrowser->GetShowInGroups())
 	{
-		m_pActiveShellBrowser->SetGroupingFlag(TRUE);
+		m_pActiveShellBrowser->SetShowInGroupsFlag(TRUE);
 	}
 
-	m_pActiveShellBrowser->SortFolder(uSortMode);
+	m_pActiveShellBrowser->SortFolder(sortMode);
 }
 
 void Explorerplusplus::SaveAllSettings(void)
 {
+	m_iLastSelectedTab = m_selectedTabIndex;
+
 	ILoadSave *pLoadSave = NULL;
 
 	if(m_bSavePreferencesToXMLFile)
@@ -1602,84 +1477,9 @@ void Explorerplusplus::SaveAllSettings(void)
 	delete pLoadSave;
 }
 
-/* Saves directory settings for a particular
-tab. */
-void Explorerplusplus::SaveDirectorySpecificSettings(int iTab)
+HWND Explorerplusplus::GetMainWindow() const
 {
-	TCITEM tcItem;
-	BOOL bRet;
-
-	tcItem.mask = TCIF_PARAM;
-	bRet = TabCtrl_GetItem(m_hTabCtrl,iTab,&tcItem);
-
-	if(bRet)
-	{
-		int iIndexInternal = (int)tcItem.lParam;
-
-		DirectorySettings_t ds;
-
-		/* TODO: First check if there are already settings held for this
-		tab. If there are, delete them first. */
-
-		ds.pidlDirectory = m_pShellBrowser[iIndexInternal]->QueryCurrentDirectoryIdl();
-
-		ds.dsi.SortMode = m_pShellBrowser[iIndexInternal]->GetSortMode();
-		ds.dsi.ViewMode = m_pShellBrowser[iIndexInternal]->GetCurrentViewMode();
-
-		ColumnExport_t ce;
-
-		m_pShellBrowser[iIndexInternal]->ExportAllColumns(&ce);
-
-		ds.dsi.ControlPanelColumnList		= ce.ControlPanelColumnList;
-		ds.dsi.MyComputerColumnList			= ce.MyComputerColumnList;
-		ds.dsi.MyNetworkPlacesColumnList	= ce.MyNetworkPlacesColumnList;
-		ds.dsi.NetworkConnectionsColumnList	= ce.NetworkConnectionsColumnList;
-		ds.dsi.PrintersColumnList			= ce.PrintersColumnList;
-		ds.dsi.RealFolderColumnList			= ce.RealFolderColumnList;
-		ds.dsi.RecycleBinColumnList			= ce.RecycleBinColumnList;
-
-		m_DirectorySettingsList.push_back(ds);
-	}
-}
-
-/* TODO: This needs to be moved into the actual shell browser. Can't change
-settings until it's known that the folder has successfully changed. */
-void Explorerplusplus::SetDirectorySpecificSettings(int iTab,LPITEMIDLIST pidlDirectory)
-{
-	if(m_DirectorySettingsList.size() > 0)
-	{
-		for each(auto ds in m_DirectorySettingsList)
-		{
-			if(CompareIdls(pidlDirectory,ds.pidlDirectory))
-			{
-				TCITEM tcItem;
-				BOOL bRet;
-
-				tcItem.mask = TCIF_PARAM;
-				bRet = TabCtrl_GetItem(m_hTabCtrl,iTab,&tcItem);
-
-				if(bRet)
-				{
-					int iIndexInternal = (int)tcItem.lParam;
-
-					m_pShellBrowser[iIndexInternal]->SetSortMode(ds.dsi.SortMode);
-					m_pShellBrowser[iIndexInternal]->SetCurrentViewMode(ds.dsi.ViewMode);
-
-					ColumnExport_t ce;
-
-					ce.ControlPanelColumnList = ds.dsi.ControlPanelColumnList;
-					ce.MyComputerColumnList = ds.dsi.MyComputerColumnList;
-					ce.MyNetworkPlacesColumnList = ds.dsi.MyNetworkPlacesColumnList;
-					ce.NetworkConnectionsColumnList = ds.dsi.NetworkConnectionsColumnList;
-					ce.PrintersColumnList = ds.dsi.PrintersColumnList;
-					ce.RealFolderColumnList = ds.dsi.RealFolderColumnList;
-					ce.RecycleBinColumnList = ds.dsi.RecycleBinColumnList;
-
-					m_pShellBrowser[iIndexInternal]->ImportAllColumns(&ce);
-				}
-			}
-		}
-	}
+	return m_hContainer;
 }
 
 HWND Explorerplusplus::GetActiveListView() const
@@ -1692,9 +1492,20 @@ CShellBrowser *Explorerplusplus::GetActiveShellBrowser() const
 	return m_pActiveShellBrowser;
 }
 
+CTabContainer *Explorerplusplus::GetTabContainer() const
+{
+	return m_tabContainer;
+}
+
+HWND Explorerplusplus::GetTreeView() const
+{
+	return m_hTreeView;
+}
+
 void Explorerplusplus::OnShowHiddenFiles(void)
 {
-	m_pActiveShellBrowser->ToggleShowHidden();
+	m_pActiveShellBrowser->SetShowHidden(!m_pActiveShellBrowser->GetShowHidden());
 
-	RefreshTab(m_selectedTabId);
+	Tab &tab = m_tabContainer->GetSelectedTab();
+	RefreshTab(tab);
 }

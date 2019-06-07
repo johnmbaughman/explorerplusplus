@@ -142,16 +142,10 @@
     <ClCompile Include="WindowHandler.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="MainToolbarHandler.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="IDropFilesCallback.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="TreeViewHandler.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AddressBarHandler.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="ArrangeMenuHandler.cpp">
@@ -231,6 +225,129 @@
     </ClCompile>
     <ClCompile Include="ShellBrowser\SortManager.cpp">
       <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellBrowser\ListView.cpp">
+      <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellBrowser\ColumnDataRetrieval.cpp">
+      <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="MainToolbar.cpp">
+      <Filter>Main Toolbar</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellBrowser\ViewModes.cpp">
+      <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSelectionTests.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellBrowser\IconRetrieval.cpp">
+      <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptingDialog.cpp">
+      <Filter>General Dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="LuaPlugin.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="ApiBinding.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="MenuApi.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="PluginMenuManager.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="Manifest.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="PluginManager.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="PluginInitialization.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="UiApi.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="UiTheming.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="AcceleratorParser.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="BookmarkMenu.cpp">
+      <Filter>Bookmarks</Filter>
+    </ClCompile>
+    <ClCompile Include="MainRebar.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="PluginCommandManager.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="PluginInterface.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="FileProgressSink.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Tab.cpp">
+      <Filter>Tabs</Filter>
+    </ClCompile>
+    <ClCompile Include="Event.cpp">
+      <Filter>Plugins</Filter>
+    </ClCompile>
+    <ClCompile Include="TabsApi.cpp">
+      <Filter>Plugins\TabsApi</Filter>
+    </ClCompile>
+    <ClCompile Include="TabCreated.cpp">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClCompile>
+    <ClCompile Include="TabMoved.cpp">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClCompile>
+    <ClCompile Include="TabRemoved.cpp">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandInvoked.cpp">
+      <Filter>Plugins\CommandApi\Events</Filter>
+    </ClCompile>
+    <ClCompile Include="TabUpdated.cpp">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClCompile>
+    <ClCompile Include="TabProperties.cpp">
+      <Filter>Plugins\TabsApi</Filter>
+    </ClCompile>
+    <ClCompile Include="AddressBar.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellBrowser\CachedIcons.cpp">
+      <Filter>ShellBrowser</Filter>
+    </ClCompile>
+    <ClCompile Include="StatusBar.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="LoadSaveRegistry.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="LoadSaveXml.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="SortModeHelper.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MainWindow.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceHelper.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandLine.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Console.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -372,9 +489,6 @@
     <ClInclude Include="RegistrySettings.h">
       <Filter>Settings</Filter>
     </ClInclude>
-    <ClInclude Include="DefaultToolbarButtons.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="ListViewEdit.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -407,6 +521,159 @@
     </ClInclude>
     <ClInclude Include="ShellBrowser\iShellView.h">
       <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\SortModes.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\ViewModes.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\Columns.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\ColumnDataRetrieval.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\ItemData.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MainToolbar.h">
+      <Filter>Main Toolbar</Filter>
+    </ClInclude>
+    <ClInclude Include="DefaultToolbarButtons.h">
+      <Filter>Main Toolbar</Filter>
+    </ClInclude>
+    <ClInclude Include="ToolbarButtons.h">
+      <Filter>Main Toolbar</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptingDialog.h">
+      <Filter>General Dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaPlugin.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="ApiBinding.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="Tab.h">
+      <Filter>Tabs</Filter>
+    </ClInclude>
+    <ClInclude Include="TabInterface.h">
+      <Filter>Tabs</Filter>
+    </ClInclude>
+    <ClInclude Include="TabContainerInterface.h">
+      <Filter>Tabs</Filter>
+    </ClInclude>
+    <ClInclude Include="MenuApi.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="PluginMenuManager.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="Manifest.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="PluginManager.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="UiApi.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="UiTheming.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="AcceleratorParser.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="Accelerator.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="BookmarkMenu.h">
+      <Filter>Bookmarks</Filter>
+    </ClInclude>
+    <ClInclude Include="PluginCommandManager.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="MenuRanges.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="PluginInterface.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="FileProgressSink.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>Plugins</Filter>
+    </ClInclude>
+    <ClInclude Include="TabsApi.h">
+      <Filter>Plugins\TabsApi</Filter>
+    </ClInclude>
+    <ClInclude Include="TabCreated.h">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClInclude>
+    <ClInclude Include="TabMoved.h">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClInclude>
+    <ClInclude Include="TabRemoved.h">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandInvoked.h">
+      <Filter>Plugins\CommandApi\Events</Filter>
+    </ClInclude>
+    <ClInclude Include="TabUpdated.h">
+      <Filter>Plugins\TabsApi\Events</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\FolderSettings.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="TabProperties.h">
+      <Filter>Plugins\TabsApi</Filter>
+    </ClInclude>
+    <ClInclude Include="BetterEnumsWrapper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="TaskbarThumbnails.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="AddressBar.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellBrowser\CachedIcons.h">
+      <Filter>ShellBrowser</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewModeHelper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="LoadSaveInterface.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="LoadSaveRegistry.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="LoadSaveXml.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SortModeHelper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreInterface.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MainWindow.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceHelper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandLine.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -510,6 +777,24 @@
     </Filter>
     <Filter Include="ShellBrowser">
       <UniqueIdentifier>{c4c4c6aa-6087-4b72-bcd0-4a1c19499130}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Main Toolbar">
+      <UniqueIdentifier>{2fe51f54-3d26-4449-92f3-ff8ee95f7751}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins">
+      <UniqueIdentifier>{09198397-1dae-4619-a80f-5af293a9b949}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\TabsApi">
+      <UniqueIdentifier>{973ffc2c-3cf3-423d-abbe-e31ebcd18f81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\TabsApi\Events">
+      <UniqueIdentifier>{d95cc55b-536e-4787-ad7f-0e8f606aaaf9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\CommandApi">
+      <UniqueIdentifier>{50af2fb1-0a7d-45b6-9c5f-6acdfebd8efe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\CommandApi\Events">
+      <UniqueIdentifier>{79e9c559-5c9a-4111-8aba-39fc4208f1fb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -1,31 +1,21 @@
-/******************************************************************
- *
- * Project: ShellBrowser
- * File: DirectoryModificationHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles directory modification messages,
- * including adding, deleting and renaming
- * items.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
 #include "IShellView.h"
+#include "Config.h"
 #include "iShellBrowser_internal.h"
+#include "ViewModes.h"
 #include "../Helper/Controls.h"
-#include "../Helper/Helper.h"
 #include "../Helper/FileOperations.h"
 #include "../Helper/FolderSize.h"
-#include "../Helper/ShellHelper.h"
+#include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
-#include "../Helper/Macros.h"
 #include "../Helper/Logging.h"
-
+#include "../Helper/Macros.h"
+#include "../Helper/ShellHelper.h"
+#include <list>
 
 BOOL g_bNewFileRenamed = FALSE;
 static int iRenamedItem;
@@ -59,7 +49,7 @@ void CShellBrowser::DirectoryAltered(void)
 	other actions for the file will take place before the addition,
 	which will again result in an incorrect state.
 	*/
-	for each(auto af in m_AlteredList)
+	for(const auto &af : m_AlteredList)
 	{
 		/* Only undertake the modification if the unique folder
 		index on the modified item and current folder match up
@@ -237,7 +227,7 @@ void CShellBrowser::OnFileActionAdded(const TCHAR *szFileName)
 
 				/* Only insert the item in its sorted position if it
 				wasn't dropped in. */
-				if(m_bInsertSorted && !bDropped)
+				if(m_config->globalFolderSettings.insertSorted && !bDropped)
 				{
 					int iItemId;
 					int iSorted;
@@ -254,7 +244,7 @@ void CShellBrowser::OnFileActionAdded(const TCHAR *szFileName)
 					AddItemInternal(m_pidlDirectory,pidlRelative,szDisplayName,-1,FALSE);
 				}
 				
-				InsertAwaitingItems(m_bShowInGroups);
+				InsertAwaitingItems(m_folderSettings.showInGroups);
 
 				bFileAdded = TRUE;
 			}
@@ -344,7 +334,7 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 
 		for(itr = m_AwaitingAddList.begin();itr!= m_AwaitingAddList.end();itr++)
 		{
-			if(lstrcmp(m_pwfdFiles[itr->iItemInternal].cFileName,FileName) == 0)
+			if(lstrcmp(m_itemInfoMap.at(itr->iItemInternal).wfd.cFileName,FileName) == 0)
 			{
 				iItemInternal = itr->iItemInternal;
 				break;
@@ -389,19 +379,19 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 	if(iItemInternal != -1)
 	{
 		/* Is this item a folder? */
-		bFolder = (m_pwfdFiles[iItemInternal].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ==
+		bFolder = (m_itemInfoMap.at(iItemInternal).wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ==
 			FILE_ATTRIBUTE_DIRECTORY;
 
-		ulFileSize.LowPart = m_pwfdFiles[iItemInternal].nFileSizeLow;
-		ulFileSize.HighPart = m_pwfdFiles[iItemInternal].nFileSizeHigh;
+		ulFileSize.LowPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow;
+		ulFileSize.HighPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh;
 
 		m_ulTotalDirSize.QuadPart -= ulFileSize.QuadPart;
 
 		if(ListView_GetItemState(m_hListView,iItem,LVIS_SELECTED)
 		== LVIS_SELECTED)
 		{
-			ulFileSize.LowPart = m_pwfdFiles[iItemInternal].nFileSizeLow;
-			ulFileSize.HighPart = m_pwfdFiles[iItemInternal].nFileSizeHigh;
+			ulFileSize.LowPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow;
+			ulFileSize.HighPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh;
 
 			m_ulFileSelectionSize.QuadPart -= ulFileSize.QuadPart;
 		}
@@ -409,25 +399,25 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 		StringCchCopy(FullFileName,SIZEOF_ARRAY(FullFileName),m_CurDir);
 		PathAppend(FullFileName,FileName);
 
-		hFirstFile = FindFirstFile(FullFileName,&m_pwfdFiles[iItemInternal]);
+		hFirstFile = FindFirstFile(FullFileName,&m_itemInfoMap.at(iItemInternal).wfd);
 
 		if(hFirstFile != INVALID_HANDLE_VALUE)
 		{
-			ulFileSize.LowPart = m_pwfdFiles[iItemInternal].nFileSizeLow;
-			ulFileSize.HighPart = m_pwfdFiles[iItemInternal].nFileSizeHigh;
+			ulFileSize.LowPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow;
+			ulFileSize.HighPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh;
 
 			m_ulTotalDirSize.QuadPart += ulFileSize.QuadPart;
 
 			if(ListView_GetItemState(m_hListView,iItem,LVIS_SELECTED)
 				== LVIS_SELECTED)
 			{
-				ulFileSize.LowPart = m_pwfdFiles[iItemInternal].nFileSizeLow;
-				ulFileSize.HighPart = m_pwfdFiles[iItemInternal].nFileSizeHigh;
+				ulFileSize.LowPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow;
+				ulFileSize.HighPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh;
 
 				m_ulFileSelectionSize.QuadPart += ulFileSize.QuadPart;
 			}
 
-			if((m_pwfdFiles[iItemInternal].dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) ==
+			if((m_itemInfoMap.at(iItemInternal).wfd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) ==
 				FILE_ATTRIBUTE_HIDDEN)
 			{
 				ListView_SetItemState(m_hListView,iItem,LVIS_CUT,LVIS_CUT);
@@ -435,10 +425,9 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 			else
 				ListView_SetItemState(m_hListView,iItem,0,LVIS_CUT);
 
-			if(m_ViewMode == VM_DETAILS)
+			if(m_folderSettings.viewMode == +ViewMode::Details)
 			{
 				std::list<Column_t>::iterator itrColumn;
-				int iColumnIndex = 0;
 
 				if(m_pActiveColumnList != NULL)
 				{
@@ -446,7 +435,7 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 					{
 						if(itrColumn->bChecked)
 						{
-							SetColumnText(itrColumn->id,iItem,iColumnIndex++);
+							QueueColumnTask(iItemInternal, itrColumn->id);
 						}
 					}
 				}
@@ -465,8 +454,8 @@ void CShellBrowser::ModifyItemInternal(const TCHAR *FileName)
 			modification. If the internal structures still hold
 			the old size, the total directory size will become
 			corrupted. */
-			m_pwfdFiles[iItemInternal].nFileSizeLow		= 0;
-			m_pwfdFiles[iItemInternal].nFileSizeHigh	= 0;
+			m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow = 0;
+			m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh = 0;
 		}
 	}
 }
@@ -555,15 +544,16 @@ void CShellBrowser::RenameItem(int iItemInternal,const TCHAR *szNewFileName)
 
 			if(SUCCEEDED(hr))
 			{
-				m_pExtraItemInfo[iItemInternal].pridl = ILClone(pidlRelative);
-				StringCchCopy(m_pExtraItemInfo[iItemInternal].szDisplayName,
-					SIZEOF_ARRAY(m_pExtraItemInfo[iItemInternal].szDisplayName),
+				m_itemInfoMap.at(iItemInternal).pidlComplete.reset(ILClone(pidlFull));
+				m_itemInfoMap.at(iItemInternal).pridl.reset(ILClone(pidlRelative));
+				StringCchCopy(m_itemInfoMap.at(iItemInternal).szDisplayName,
+					SIZEOF_ARRAY(m_itemInfoMap.at(iItemInternal).szDisplayName),
 					szDisplayName);
 
 				/* Need to update internal storage for the item, since
 				it's name has now changed. */
-				StringCchCopy(m_pwfdFiles[iItemInternal].cFileName,
-					SIZEOF_ARRAY(m_pwfdFiles[iItemInternal].cFileName),
+				StringCchCopy(m_itemInfoMap.at(iItemInternal).wfd.cFileName,
+					SIZEOF_ARRAY(m_itemInfoMap.at(iItemInternal).wfd.cFileName),
 					szNewFileName);
 
 				/* The files' type may have changed, so retrieve the files'
@@ -581,11 +571,17 @@ void CShellBrowser::RenameItem(int iItemInternal,const TCHAR *szNewFileName)
 
 					if(iItem != -1)
 					{
+						BasicItemInfo_t basicItemInfo = getBasicItemInfo(iItemInternal);
+						std::wstring filename = ProcessItemFileName(basicItemInfo, m_config->globalFolderSettings);
+
+						TCHAR filenameCopy[MAX_PATH];
+						StringCchCopy(filenameCopy, SIZEOF_ARRAY(filenameCopy), filename.c_str());
+
 						lvItem.mask			= LVIF_TEXT|LVIF_IMAGE|LVIF_STATE;
 						lvItem.iItem		= iItem;
 						lvItem.iSubItem		= 0;
 						lvItem.iImage		= shfi.iIcon;
-						lvItem.pszText		= ProcessItemFileName(iItemInternal);
+						lvItem.pszText		= filenameCopy;
 						lvItem.stateMask	= LVIS_OVERLAYMASK;
 
 						/* As well as resetting the items icon, we'll also set
@@ -614,11 +610,11 @@ void CShellBrowser::RenameItem(int iItemInternal,const TCHAR *szNewFileName)
 	}
 	else
 	{
-		StringCchCopy(m_pExtraItemInfo[iItemInternal].szDisplayName,
-			SIZEOF_ARRAY(m_pExtraItemInfo[iItemInternal].szDisplayName), szNewFileName);
+		StringCchCopy(m_itemInfoMap.at(iItemInternal).szDisplayName,
+			SIZEOF_ARRAY(m_itemInfoMap.at(iItemInternal).szDisplayName), szNewFileName);
 
-		StringCchCopy(m_pwfdFiles[iItemInternal].cFileName,
-			SIZEOF_ARRAY(m_pwfdFiles[iItemInternal].cFileName),
+		StringCchCopy(m_itemInfoMap.at(iItemInternal).wfd.cFileName,
+			SIZEOF_ARRAY(m_itemInfoMap.at(iItemInternal).wfd.cFileName),
 			szNewFileName);
 	}
 }

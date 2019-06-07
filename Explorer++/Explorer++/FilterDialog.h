@@ -1,10 +1,15 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include "CoreInterface.h"
 #include "../Helper/BaseDialog.h"
-#include "../Helper/ResizableDialog.h"
 #include "../Helper/DialogSettings.h"
-
-#import <msxml3.dll> raw_interfaces_only
+#include "../Helper/ResizableDialog.h"
+#include <MsXml2.h>
+#include <objbase.h>
 
 class CFilterDialog;
 
@@ -32,7 +37,7 @@ private:
 	void SaveExtraRegistrySettings(HKEY hKey);
 	void LoadExtraRegistrySettings(HKEY hKey);
 
-	void SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	void SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	void LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	std::list<std::wstring>	m_FilterList;

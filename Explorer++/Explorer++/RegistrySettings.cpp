@@ -1,24 +1,20 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: Settings.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Saves and loads all main program settings.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "DefaultColumns.h"
 #include "Explorer++.h"
+#include "ApplicationToolbar.h"
+#include "ColorRuleHelper.h"
+#include "Config.h"
+#include "DefaultColumns.h"
 #include "Explorer++_internal.h"
+#include "MainToolbar.h"
 #include "../DisplayWindow/DisplayWindow.h"
+#include "../Helper/Bookmark.h"
 #include "../Helper/RegistrySettings.h"
 #include "../Helper/Macros.h"
-
+#include <boost/range/adaptor/map.hpp>
 
 namespace
 {
@@ -101,70 +97,70 @@ LONG Explorerplusplus::SaveSettings(void)
 
 		/* User settings. */
 		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("LastSelectedTab"),m_iLastSelectedTab);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowExtensions"),m_bShowExtensionsGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowStatusBar"),m_bShowStatusBar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFolders"),m_bShowFolders);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowAddressBar"),m_bShowAddressBar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowToolbar"),m_bShowMainToolbar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowBookmarksToolbar"),m_bShowBookmarksToolbar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowDrivesToolbar"),m_bShowDrivesToolbar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowApplicationToolbar"),m_bShowApplicationToolbar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFullTitlePath"),m_bShowFullTitlePath);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AlwaysOpenNewTab"),m_bAlwaysOpenNewTab);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TreeViewWidth"),m_TreeViewWidth);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFriendlyDates"),m_bShowFriendlyDatesGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowDisplayWindow"),m_bShowDisplayWindow);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFolderSizes"),m_bShowFolderSizes);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DisableFolderSizesNetworkRemovable"),m_bDisableFolderSizesNetworkRemovable);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("StartupMode"),m_StartupMode);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("NextToCurrent"),m_bOpenNewTabNextToCurrent);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ConfirmCloseTabs"),m_bConfirmCloseTabs);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowInfoTips"),m_bShowInfoTips);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("InfoTipType"),m_InfoTipType);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TreeViewDelayEnabled"),m_bTreeViewDelayEnabled);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("LockToolbars"),m_bLockToolbars);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ExtendTabControl"),m_bExtendTabControl);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("UseFullRowSelect"),m_bUseFullRowSelect);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFilePreviews"),m_bShowFilePreviews);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ReplaceExplorerMode"),m_ReplaceExplorerMode);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowUserNameTitleBar"),m_bShowUserNameInTitleBar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AllowMultipleInstances"),m_bAllowMultipleInstances);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OneClickActivate"),m_bOneClickActivate);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OneClickActivateHoverTime"),m_OneClickActivateHoverTime);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ForceSameTabWidth"),m_bForceSameTabWidth);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DoubleClickTabClose"),m_bDoubleClickTabClose);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HandleZipFiles"),m_bHandleZipFiles);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("InsertSorted"),m_bInsertSorted);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowPrivilegeLevelInTitleBar"),m_bShowPrivilegeLevelInTitleBar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AlwaysShowTabBar"),m_bAlwaysShowTabBar);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("CheckBoxSelection"),m_bCheckBoxSelection);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ForceSize"),m_bForceSize);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SizeDisplayFormat"),m_SizeDisplayFormat);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("CloseMainWindowOnTabClose"),m_bCloseMainWindowOnTabClose);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowTabBarAtBottom"),m_bShowTabBarAtBottom);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OverwriteExistingFilesConfirmation"),m_bOverwriteExistingFilesConfirmation);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("LargeToolbarIcons"),m_bLargeToolbarIcons);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("PlayNavigationSound"),m_bPlayNavigationSound);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowExtensions"), m_config->globalFolderSettings.showExtensions);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowStatusBar"), m_config->showStatusBar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFolders"), m_config->showFolders);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowAddressBar"),m_config->showAddressBar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowToolbar"),m_config->showMainToolbar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowBookmarksToolbar"),m_config->showBookmarksToolbar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowDrivesToolbar"),m_config->showDrivesToolbar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowApplicationToolbar"),m_config->showApplicationToolbar);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFullTitlePath"),m_config->showFullTitlePath.get());
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AlwaysOpenNewTab"),m_config->alwaysOpenNewTab);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TreeViewWidth"), m_config->treeViewWidth);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFriendlyDates"), m_config->globalFolderSettings.showFriendlyDates);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowDisplayWindow"),m_config->showDisplayWindow);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFolderSizes"),m_config->globalFolderSettings.showFolderSizes);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DisableFolderSizesNetworkRemovable"),m_config->globalFolderSettings.disableFolderSizesNetworkRemovable);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("StartupMode"), m_config->startupMode);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("NextToCurrent"),m_config->openNewTabNextToCurrent);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ConfirmCloseTabs"), m_config->confirmCloseTabs);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowInfoTips"), m_config->showInfoTips);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("InfoTipType"), m_config->infoTipType);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TreeViewDelayEnabled"),m_config->treeViewDelayEnabled);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("LockToolbars"), m_config->lockToolbars);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ExtendTabControl"),m_config->extendTabControl);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("UseFullRowSelect"),m_config->useFullRowSelect);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowFilePreviews"),m_config->showFilePreviews);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ReplaceExplorerMode"), m_config->replaceExplorerMode);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowUserNameTitleBar"),m_config->showUserNameInTitleBar.get());
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AllowMultipleInstances"),m_config->allowMultipleInstances);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OneClickActivate"),m_config->globalFolderSettings.oneClickActivate);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OneClickActivateHoverTime"),m_config->globalFolderSettings.oneClickActivateHoverTime);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ForceSameTabWidth"),m_config->forceSameTabWidth.get());
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DoubleClickTabClose"),m_config->doubleClickTabClose);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HandleZipFiles"),m_config->handleZipFiles);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("InsertSorted"),m_config->globalFolderSettings.insertSorted);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowPrivilegeLevelInTitleBar"),m_config->showPrivilegeLevelInTitleBar.get());
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AlwaysShowTabBar"),m_config->alwaysShowTabBar.get());
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("CheckBoxSelection"),m_config->checkBoxSelection);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ForceSize"),m_config->globalFolderSettings.forceSize);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SizeDisplayFormat"),m_config->globalFolderSettings.sizeDisplayFormat);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("CloseMainWindowOnTabClose"),m_config->closeMainWindowOnTabClose);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowTabBarAtBottom"), m_config->showTabBarAtBottom);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("OverwriteExistingFilesConfirmation"),m_config->overwriteExistingFilesConfirmation);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("LargeToolbarIcons"),m_config->useLargeToolbarIcons);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("PlayNavigationSound"),m_config->playNavigationSound);
 
-		NRegistrySettings::SaveStringToRegistry(hSettingsKey,_T("NewTabDirectory"),m_DefaultTabDirectory);
+		NRegistrySettings::SaveStringToRegistry(hSettingsKey,_T("NewTabDirectory"), m_config->defaultTabDirectory.c_str());
 
 		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("Language"),m_Language);
 
 		/* Global settings. */
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowHiddenGlobal"),m_bShowHiddenGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ViewModeGlobal"),m_ViewModeGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowGridlinesGlobal"),m_bShowGridlinesGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowInGroupsGlobal"),m_bShowInGroupsGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AutoArrangeGlobal"),m_bAutoArrangeGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SortAscendingGlobal"),m_bSortAscendingGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HideSystemFilesGlobal"),m_bHideSystemFilesGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HideLinkExtensionGlobal"),m_bHideLinkExtensionGlobal);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowTaskbarThumbnails"),m_bShowTaskbarThumbnails);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SynchronizeTreeview"),m_bSynchronizeTreeview);
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TVAutoExpandSelected"),m_bTVAutoExpandSelected);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowHiddenGlobal"), m_config->defaultFolderSettings.showHidden);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ViewModeGlobal"), m_config->defaultFolderSettings.viewMode);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowGridlinesGlobal"), m_config->globalFolderSettings.showGridlines);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowInGroupsGlobal"), m_config->defaultFolderSettings.showInGroups);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("AutoArrangeGlobal"), m_config->defaultFolderSettings.autoArrange);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SortAscendingGlobal"), m_config->defaultFolderSettings.sortAscending);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HideSystemFilesGlobal"),m_config->globalFolderSettings.hideSystemFiles);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("HideLinkExtensionGlobal"), m_config->globalFolderSettings.hideLinkExtension);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("ShowTaskbarThumbnails"), m_config->showTaskbarThumbnails);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("SynchronizeTreeview"), m_config->synchronizeTreeview);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("TVAutoExpandSelected"), m_config->treeViewAutoExpandSelected);
 
 		/* Display window settings. */
-		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DisplayWindowHeight"),m_DisplayWindowHeight);
+		NRegistrySettings::SaveDwordToRegistry(hSettingsKey,_T("DisplayWindowHeight"), m_config->displayWindowHeight);
 
 		COLORREF CentreColor;
 		COLORREF SurroundColor;
@@ -191,11 +187,14 @@ LONG Explorerplusplus::SaveSettings(void)
 		RegSetValueEx(hSettingsKey,_T("DisplayFont"),0,REG_BINARY,
 			(LPBYTE)&LogFont,sizeof(LOGFONT));
 
+		/* TODO: This should
+		be done within the
+		main toolbar class. */
 		tbSave.hkr			= HKEY_CURRENT_USER;
 		tbSave.pszSubKey	= NExplorerplusplus::REG_SETTINGS_KEY;
 		tbSave.pszValueName	= _T("ToolbarState");
 
-		SendMessage(m_hMainToolbar,TB_SAVERESTORE,TRUE,(LPARAM)&tbSave);
+		SendMessage(m_mainToolbar->GetHWND(),TB_SAVERESTORE,TRUE,(LPARAM)&tbSave);
 
 		RegCloseKey(hSettingsKey);
 	}
@@ -220,55 +219,69 @@ LONG Explorerplusplus::LoadSettings()
 	{
 		/* User settings. */
 		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("LastSelectedTab"),(LPDWORD)&m_iLastSelectedTab);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowExtensions"),(LPDWORD)&m_bShowExtensionsGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowStatusBar"),(LPDWORD)&m_bShowStatusBar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFolders"),(LPDWORD)&m_bShowFolders);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowAddressBar"),(LPDWORD)&m_bShowAddressBar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowToolbar"),(LPDWORD)&m_bShowMainToolbar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowBookmarksToolbar"),(LPDWORD)&m_bShowBookmarksToolbar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowDrivesToolbar"),(LPDWORD)&m_bShowDrivesToolbar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowApplicationToolbar"),(LPDWORD)&m_bShowApplicationToolbar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFullTitlePath"),(LPDWORD)&m_bShowFullTitlePath);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AlwaysOpenNewTab"),(LPDWORD)&m_bAlwaysOpenNewTab);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TreeViewWidth"),(LPDWORD)&m_TreeViewWidth);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFriendlyDates"),(LPDWORD)&m_bShowFriendlyDatesGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowDisplayWindow"),(LPDWORD)&m_bShowDisplayWindow);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFolderSizes"),(LPDWORD)&m_bShowFolderSizes);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DisableFolderSizesNetworkRemovable"),(LPDWORD)&m_bDisableFolderSizesNetworkRemovable);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("StartupMode"),(LPDWORD)&m_StartupMode);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("NextToCurrent"),(LPDWORD)&m_bOpenNewTabNextToCurrent);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ConfirmCloseTabs"),(LPDWORD)&m_bConfirmCloseTabs);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowInfoTips"),(LPDWORD)&m_bShowInfoTips);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("InfoTipType"),(LPDWORD)&m_InfoTipType);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TreeViewDelayEnabled"),(LPDWORD)&m_bTreeViewDelayEnabled);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("LockToolbars"),(LPDWORD)&m_bLockToolbars);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ExtendTabControl"),(LPDWORD)&m_bExtendTabControl);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("UseFullRowSelect"),(LPDWORD)&m_bUseFullRowSelect);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFilePreviews"),(LPDWORD)&m_bShowFilePreviews);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ReplaceExplorerMode"),(LPDWORD)&m_ReplaceExplorerMode);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowUserNameTitleBar"),(LPDWORD)&m_bShowUserNameInTitleBar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AllowMultipleInstances"),(LPDWORD)&m_bAllowMultipleInstances);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OneClickActivate"),(LPDWORD)&m_bOneClickActivate);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OneClickActivateHoverTime"),(LPDWORD)&m_OneClickActivateHoverTime);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ForceSameTabWidth"),(LPDWORD)&m_bForceSameTabWidth);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DoubleClickTabClose"),(LPDWORD)&m_bDoubleClickTabClose);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HandleZipFiles"),(LPDWORD)&m_bHandleZipFiles);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("InsertSorted"),(LPDWORD)&m_bInsertSorted);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowPrivilegeLevelInTitleBar"),(LPDWORD)&m_bShowPrivilegeLevelInTitleBar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AlwaysShowTabBar"),(LPDWORD)&m_bAlwaysShowTabBar);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("CheckBoxSelection"),(LPDWORD)&m_bCheckBoxSelection);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ForceSize"),(LPDWORD)&m_bForceSize);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SizeDisplayFormat"),(LPDWORD)&m_SizeDisplayFormat);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("CloseMainWindowOnTabClose"),(LPDWORD)&m_bCloseMainWindowOnTabClose);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowTabBarAtBottom"),(LPDWORD)&m_bShowTabBarAtBottom);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowTaskbarThumbnails"),(LPDWORD)&m_bShowTaskbarThumbnails);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SynchronizeTreeview"),(LPDWORD)&m_bSynchronizeTreeview);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TVAutoExpandSelected"),(LPDWORD)&m_bTVAutoExpandSelected);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OverwriteExistingFilesConfirmation"),(LPDWORD)&m_bOverwriteExistingFilesConfirmation);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("LargeToolbarIcons"),(LPDWORD)&m_bLargeToolbarIcons);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("PlayNavigationSound"),(LPDWORD)&m_bPlayNavigationSound);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowExtensions"),(LPDWORD)&m_config->globalFolderSettings.showExtensions);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowStatusBar"),(LPDWORD)&m_config->showStatusBar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFolders"),(LPDWORD)&m_config->showFolders);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowAddressBar"),(LPDWORD)&m_config->showAddressBar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowToolbar"),(LPDWORD)&m_config->showMainToolbar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowBookmarksToolbar"),(LPDWORD)&m_config->showBookmarksToolbar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowDrivesToolbar"),(LPDWORD)&m_config->showDrivesToolbar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowApplicationToolbar"),(LPDWORD)&m_config->showApplicationToolbar);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AlwaysOpenNewTab"),(LPDWORD)&m_config->alwaysOpenNewTab);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TreeViewWidth"),(LPDWORD)&m_config->treeViewWidth);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFriendlyDates"),(LPDWORD)&m_config->globalFolderSettings.showFriendlyDates);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowDisplayWindow"),(LPDWORD)&m_config->showDisplayWindow);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFolderSizes"),(LPDWORD)&m_config->globalFolderSettings.showFolderSizes);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DisableFolderSizesNetworkRemovable"),(LPDWORD)&m_config->globalFolderSettings.disableFolderSizesNetworkRemovable);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("StartupMode"),(LPDWORD)&m_config->startupMode);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("NextToCurrent"),(LPDWORD)&m_config->openNewTabNextToCurrent);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ConfirmCloseTabs"),(LPDWORD)&m_config->confirmCloseTabs);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowInfoTips"),(LPDWORD)&m_config->showInfoTips);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("InfoTipType"),(LPDWORD)&m_config->infoTipType);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TreeViewDelayEnabled"),(LPDWORD)&m_config->treeViewDelayEnabled);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("LockToolbars"),(LPDWORD)&m_config->lockToolbars);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ExtendTabControl"),(LPDWORD)&m_config->extendTabControl);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("UseFullRowSelect"),(LPDWORD)&m_config->useFullRowSelect);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowFilePreviews"),(LPDWORD)&m_config->showFilePreviews);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ReplaceExplorerMode"),(LPDWORD)&m_config->replaceExplorerMode);
 
-		NRegistrySettings::ReadStringFromRegistry(hSettingsKey,_T("NewTabDirectory"),m_DefaultTabDirectory,SIZEOF_ARRAY(m_DefaultTabDirectory));
+		DWORD numericValue;
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey, _T("ShowFullTitlePath"), &numericValue);
+		m_config->showFullTitlePath.set(numericValue);
+
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey, _T("ShowUserNameTitleBar"), &numericValue);
+		m_config->showUserNameInTitleBar.set(numericValue);
+
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey, _T("ShowPrivilegeLevelInTitleBar"), &numericValue);
+		m_config->showPrivilegeLevelInTitleBar.set(numericValue);
+
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey, _T("AlwaysShowTabBar"), &numericValue);
+		m_config->alwaysShowTabBar.set(numericValue);
+
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey, _T("ForceSameTabWidth"), &numericValue);
+		m_config->forceSameTabWidth.set(numericValue);
+
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AllowMultipleInstances"),(LPDWORD)&m_config->allowMultipleInstances);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OneClickActivate"),(LPDWORD)&m_config->globalFolderSettings.oneClickActivate);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OneClickActivateHoverTime"),(LPDWORD)&m_config->globalFolderSettings.oneClickActivateHoverTime);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DoubleClickTabClose"),(LPDWORD)&m_config->doubleClickTabClose);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HandleZipFiles"),(LPDWORD)&m_config->handleZipFiles);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("InsertSorted"),(LPDWORD)&m_config->globalFolderSettings.insertSorted);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("CheckBoxSelection"),(LPDWORD)&m_config->checkBoxSelection);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ForceSize"),(LPDWORD)&m_config->globalFolderSettings.forceSize);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SizeDisplayFormat"),(LPDWORD)&m_config->globalFolderSettings.sizeDisplayFormat);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("CloseMainWindowOnTabClose"),(LPDWORD)&m_config->closeMainWindowOnTabClose);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowTabBarAtBottom"),(LPDWORD)&m_config->showTabBarAtBottom);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowTaskbarThumbnails"),(LPDWORD)&m_config->showTaskbarThumbnails);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SynchronizeTreeview"),(LPDWORD)&m_config->synchronizeTreeview);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("TVAutoExpandSelected"),(LPDWORD)&m_config->treeViewAutoExpandSelected);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("OverwriteExistingFilesConfirmation"),(LPDWORD)&m_config->overwriteExistingFilesConfirmation);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("LargeToolbarIcons"),(LPDWORD)&m_config->useLargeToolbarIcons);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("PlayNavigationSound"),(LPDWORD)&m_config->playNavigationSound);
+
+		TCHAR value[MAX_PATH];
+		NRegistrySettings::ReadStringFromRegistry(hSettingsKey,_T("NewTabDirectory"),value,SIZEOF_ARRAY(value));
+		m_config->defaultTabDirectory = value;
 
 		lStatus = NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("Language"),(LPDWORD)&m_Language);
 
@@ -276,17 +289,17 @@ LONG Explorerplusplus::LoadSettings()
 			m_bLanguageLoaded = TRUE;
 
 		/* Global settings. */
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowHiddenGlobal"),(LPDWORD)&m_bShowHiddenGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ViewModeGlobal"),(LPDWORD)&m_ViewModeGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowGridlinesGlobal"),(LPDWORD)&m_bShowGridlinesGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowInGroupsGlobal"),(LPDWORD)&m_bShowInGroupsGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AutoArrangeGlobal"),(LPDWORD)&m_bAutoArrangeGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SortAscendingGlobal"),(LPDWORD)&m_bSortAscendingGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HideSystemFilesGlobal"),(LPDWORD)&m_bHideSystemFilesGlobal);
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HideLinkExtensionGlobal"),(LPDWORD)&m_bHideLinkExtensionGlobal);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowHiddenGlobal"),(LPDWORD)&m_config->defaultFolderSettings.showHidden);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ViewModeGlobal"),(LPDWORD)&m_config->defaultFolderSettings.viewMode);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowGridlinesGlobal"),(LPDWORD)&m_config->globalFolderSettings.showGridlines);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("ShowInGroupsGlobal"),(LPDWORD)&m_config->defaultFolderSettings.showInGroups);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("AutoArrangeGlobal"),(LPDWORD)&m_config->defaultFolderSettings.autoArrange);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("SortAscendingGlobal"),(LPDWORD)&m_config->defaultFolderSettings.sortAscending);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HideSystemFilesGlobal"),(LPDWORD)&m_config->globalFolderSettings.hideSystemFiles);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("HideLinkExtensionGlobal"),(LPDWORD)&m_config->globalFolderSettings.hideLinkExtension);
 
 		/* Display window settings. */
-		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DisplayWindowHeight"),(LPDWORD)&m_DisplayWindowHeight);
+		NRegistrySettings::ReadDwordFromRegistry(hSettingsKey,_T("DisplayWindowHeight"),(LPDWORD)&m_config->displayWindowHeight);
 
 		COLORREF CentreColor;
 		COLORREF SurroundColor;
@@ -330,8 +343,6 @@ LONG Explorerplusplus::LoadSettings()
 
 		RegCloseKey(hSettingsKey);
 	}
-
-	SetInitialToolbarButtons();
 
 	if(SurroundColorStatus != ERROR_SUCCESS)
 		m_DisplayWindowSurroundColor	= DEFAULT_DISPLAYWINDOW_SURROUND_COLOR;
@@ -427,15 +438,12 @@ void Explorerplusplus::SaveTabSettingsToRegistry(void)
 	HKEY	hKey;
 	HKEY	hTabKey;
 	HKEY	hColumnsKey;
-	TCITEM	tcItem;
 	TCHAR	szItemKey[128];
 	LPITEMIDLIST	pidlDirectory = NULL;
 	UINT	ViewMode;
 	UINT	SortMode;
 	DWORD	Disposition;
 	LONG	ReturnValue;
-	int		iNumTabs;
-	int		i = 0;
 
 	/* First, delete all current tab keys. If these keys
 	are not deleted beforehand, then they may be opened
@@ -449,16 +457,14 @@ void Explorerplusplus::SaveTabSettingsToRegistry(void)
 
 	if(ReturnValue == ERROR_SUCCESS)
 	{
-		iNumTabs = TabCtrl_GetItemCount(m_hTabCtrl);
+		int tabNum = 0;
 
-		tcItem.mask = TCIF_PARAM;
-
-		for(i = 0;i < iNumTabs;i++)
+		for (auto tabRef : m_tabContainer->GetAllTabsInOrder())
 		{
-			TabCtrl_GetItem(m_hTabCtrl,i,&tcItem);
+			auto &tab = tabRef.get();
 
 			StringCchPrintf(szItemKey,SIZEOF_ARRAY(szItemKey),
-				_T("%d"),i);
+				_T("%d"),tabNum);
 
 			ReturnValue = RegCreateKeyEx(hKey,szItemKey,0,NULL,
 				REG_OPTION_NON_VOLATILE,KEY_WRITE,
@@ -466,29 +472,28 @@ void Explorerplusplus::SaveTabSettingsToRegistry(void)
 
 			if(ReturnValue == ERROR_SUCCESS)
 			{
-				pidlDirectory = m_pShellBrowser[(int)tcItem.lParam]->QueryCurrentDirectoryIdl();
+				pidlDirectory = tab.GetShellBrowser()->QueryCurrentDirectoryIdl();
 				RegSetValueEx(hTabKey,_T("Directory"),0,REG_BINARY,
 					(LPBYTE)pidlDirectory,ILGetSize(pidlDirectory));
 				CoTaskMemFree((LPVOID)pidlDirectory);
 
-				ViewMode = m_pShellBrowser[(int) tcItem.lParam]->GetCurrentViewMode();
+				ViewMode = tab.GetShellBrowser()->GetViewMode();
 
 				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ViewMode"),ViewMode);
 
-				SortMode = m_pShellBrowser[(int) tcItem.lParam]->GetSortMode();
+				SortMode = tab.GetShellBrowser()->GetSortMode();
 				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("SortMode"),SortMode);
 
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("SortAscending"),m_pShellBrowser[(int)tcItem.lParam]->GetSortAscending());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ShowInGroups"),m_pShellBrowser[(int)tcItem.lParam]->IsGroupViewEnabled());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ApplyFilter"),m_pShellBrowser[(int)tcItem.lParam]->GetFilterStatus());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("FilterCaseSensitive"),m_pShellBrowser[(int)tcItem.lParam]->GetFilterCaseSensitive());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ShowHidden"),m_pShellBrowser[(int)tcItem.lParam]->GetShowHidden());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("AutoArrange"),m_pShellBrowser[(int)tcItem.lParam]->GetAutoArrange());
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ShowGridlines"),m_pShellBrowser[(int)tcItem.lParam]->QueryGridlinesActive());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("SortAscending"), tab.GetShellBrowser()->GetSortAscending());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ShowInGroups"), tab.GetShellBrowser()->GetShowInGroups());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ApplyFilter"), tab.GetShellBrowser()->GetFilterStatus());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("FilterCaseSensitive"), tab.GetShellBrowser()->GetFilterCaseSensitive());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("ShowHidden"), tab.GetShellBrowser()->GetShowHidden());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("AutoArrange"), tab.GetShellBrowser()->GetAutoArrange());
 
 				TCHAR szFilter[512];
 
-				m_pShellBrowser[(int)tcItem.lParam]->GetFilter(szFilter,SIZEOF_ARRAY(szFilter));
+				tab.GetShellBrowser()->GetFilter(szFilter,SIZEOF_ARRAY(szFilter));
 				NRegistrySettings::SaveStringToRegistry(hTabKey,_T("Filter"),szFilter);
 
 				/* Now save the tabs columns. */
@@ -500,7 +505,7 @@ void Explorerplusplus::SaveTabSettingsToRegistry(void)
 				{
 					ColumnExport_t cie;
 
-					m_pShellBrowser[(int)tcItem.lParam]->ExportAllColumns(&cie);
+					tab.GetShellBrowser()->ExportAllColumns(&cie);
 
 					SaveColumnToRegistry(hColumnsKey,_T("ControlPanelColumns"),&cie.ControlPanelColumnList);
 					SaveColumnToRegistry(hColumnsKey,_T("MyComputerColumns"),&cie.MyComputerColumnList);
@@ -524,17 +529,19 @@ void Explorerplusplus::SaveTabSettingsToRegistry(void)
 				}
 
 				/* High-level settings. */
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("Locked"),m_TabInfo.at((int)tcItem.lParam).bLocked);
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("AddressLocked"),m_TabInfo.at((int)tcItem.lParam).bAddressLocked);
-				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("UseCustomName"),m_TabInfo.at((int)tcItem.lParam).bUseCustomName);
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("Locked"),tab.GetLocked());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("AddressLocked"),tab.GetAddressLocked());
+				NRegistrySettings::SaveDwordToRegistry(hTabKey,_T("UseCustomName"),tab.GetUseCustomName());
 
-				if(m_TabInfo.at((int)tcItem.lParam).bUseCustomName)
-					NRegistrySettings::SaveStringToRegistry(hTabKey,_T("CustomName"),m_TabInfo.at((int)tcItem.lParam).szName);
+				if(tab.GetUseCustomName())
+					NRegistrySettings::SaveStringToRegistry(hTabKey,_T("CustomName"),tab.GetName().c_str());
 				else
 					NRegistrySettings::SaveStringToRegistry(hTabKey,_T("CustomName"),EMPTY_STRING);
 
 				RegCloseKey(hTabKey);
 			}
+
+			tabNum++;
 		}
 
 		RegCloseKey(hKey);
@@ -564,8 +571,6 @@ int Explorerplusplus::LoadTabSettingsFromRegistry(void)
 	HKEY				hKey;
 	HKEY				hTabKey;
 	HKEY				hColumnsKey;
-	InitialSettings_t	Settings;
-	TabInfo_t			TabInfo;
 	TCHAR				szItemKey[128];
 	LPITEMIDLIST		pidlDirectory = NULL;
 	LONG				ReturnValue;
@@ -594,20 +599,25 @@ int Explorerplusplus::LoadTabSettingsFromRegistry(void)
 				RegQueryValueEx(hTabKey,_T("Directory"),0,&Type,(LPBYTE)pidlDirectory,&cbData);
 			}
 
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ViewMode"),(LPDWORD)&Settings.ViewMode);
+			FolderSettings folderSettings;
 
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("SortMode"),(LPDWORD)&Settings.SortMode);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("SortAscending"),(LPDWORD)&Settings.bSortAscending);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ShowInGroups"),(LPDWORD)&Settings.bShowInGroups);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ApplyFilter"),(LPDWORD)&Settings.bApplyFilter);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("FilterCaseSensitive"),(LPDWORD)&Settings.bFilterCaseSensitive);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ShowHidden"),(LPDWORD)&Settings.bShowHidden);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("AutoArrange"),(LPDWORD)&Settings.bAutoArrange);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ShowGridlines"),(LPDWORD)&Settings.bGridlinesActive);
-			NRegistrySettings::ReadStringFromRegistry(hTabKey,_T("Filter"),Settings.szFilter,SIZEOF_ARRAY(Settings.szFilter));
+			DWORD value;
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ViewMode"),&value);
+			folderSettings.viewMode = ViewMode::_from_integral(value);
 
-			Settings.bShowFolderSizes = m_bShowFolderSizes;
-			Settings.bDisableFolderSizesNetworkRemovable = m_bDisableFolderSizesNetworkRemovable;
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("SortMode"),&value);
+			folderSettings.sortMode = SortMode::_from_integral(value);
+
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("SortAscending"),(LPDWORD)&folderSettings.sortAscending);
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ShowInGroups"),(LPDWORD)&folderSettings.showInGroups);
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ApplyFilter"),(LPDWORD)&folderSettings.applyFilter);
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("FilterCaseSensitive"),(LPDWORD)&folderSettings.filterCaseSensitive);
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("ShowHidden"),(LPDWORD)&folderSettings.showHidden);
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("AutoArrange"),(LPDWORD)&folderSettings.autoArrange);
+
+			TCHAR filter[512];
+			NRegistrySettings::ReadStringFromRegistry(hTabKey,_T("Filter"),filter,SIZEOF_ARRAY(filter));
+			folderSettings.filter = filter;
 
 			std::list<Column_t>	RealFolderColumnList;
 			std::list<Column_t>	MyComputerColumnList;
@@ -665,22 +675,31 @@ int Explorerplusplus::LoadTabSettingsFromRegistry(void)
 			ValidateSingleColumnSet(VALIDATE_NETWORKCONNECTIONS_COLUMNS,&NetworkConnectionsColumnList);
 			ValidateSingleColumnSet(VALIDATE_MYNETWORKPLACES_COLUMNS,&MyNetworkPlacesColumnList);
 
-			Settings.pControlPanelColumnList		= &ControlPanelColumnList;
-			Settings.pMyComputerColumnList			= &MyComputerColumnList;
-			Settings.pMyNetworkPlacesColumnList		= &MyNetworkPlacesColumnList;
-			Settings.pNetworkConnectionsColumnList	= &NetworkConnectionsColumnList;
-			Settings.pPrintersColumnList			= &PrintersColumnList;
-			Settings.pRealFolderColumnList			= &RealFolderColumnList;
-			Settings.pRecycleBinColumnList			= &RecycleBinColumnList;
+			InitialColumns initialColumns;
 
-			/* High-level settings. */
-			SetDefaultTabSettings(&TabInfo);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("Locked"),(LPDWORD)&TabInfo.bLocked);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("AddressLocked"),(LPDWORD)&TabInfo.bAddressLocked);
-			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("UseCustomName"),(LPDWORD)&TabInfo.bUseCustomName);
-			NRegistrySettings::ReadStringFromRegistry(hTabKey,_T("CustomName"),TabInfo.szName,SIZEOF_ARRAY(TabInfo.szName));
+			initialColumns.pControlPanelColumnList			= &ControlPanelColumnList;
+			initialColumns.pMyComputerColumnList			= &MyComputerColumnList;
+			initialColumns.pMyNetworkPlacesColumnList		= &MyNetworkPlacesColumnList;
+			initialColumns.pNetworkConnectionsColumnList	= &NetworkConnectionsColumnList;
+			initialColumns.pPrintersColumnList				= &PrintersColumnList;
+			initialColumns.pRealFolderColumnList			= &RealFolderColumnList;
+			initialColumns.pRecycleBinColumnList			= &RecycleBinColumnList;
 
-			hr = CreateNewTab(pidlDirectory,&Settings,&TabInfo,TRUE,NULL);
+			TabSettings tabSettings;
+
+			tabSettings.selected = true;
+
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("Locked"),&value);
+			tabSettings.locked = value;
+
+			NRegistrySettings::ReadDwordFromRegistry(hTabKey,_T("AddressLocked"),&value);
+			tabSettings.addressLocked = value;
+
+			TCHAR customName[64];
+			NRegistrySettings::ReadStringFromRegistry(hTabKey,_T("CustomName"),customName,SIZEOF_ARRAY(customName));
+			tabSettings.name = customName;
+
+			hr = CreateNewTab(pidlDirectory, tabSettings, &folderSettings, &initialColumns);
 
 			if(hr == S_OK)
 				nTabsCreated++;
@@ -1029,95 +1048,4 @@ void Explorerplusplus::SaveApplicationToolbarToRegistry()
 
 		RegCloseKey(hKey);
 	}
-}
-
-Explorerplusplus::CLoadSaveRegistry::CLoadSaveRegistry(Explorerplusplus *pContainer) :
-m_pContainer(pContainer)
-{
-	 
-}
-
-Explorerplusplus::CLoadSaveRegistry::~CLoadSaveRegistry()
-{
-
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadGenericSettings()
-{
-	m_pContainer->LoadSettings();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadBookmarks()
-{
-	m_pContainer->LoadBookmarksFromRegistry();
-}
-
-int Explorerplusplus::CLoadSaveRegistry::LoadPreviousTabs()
-{
-	return m_pContainer->LoadTabSettingsFromRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadDefaultColumns()
-{
-	m_pContainer->LoadDefaultColumnsFromRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadApplicationToolbar()
-{
-	m_pContainer->LoadApplicationToolbarFromRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadToolbarInformation()
-{
-	m_pContainer->LoadToolbarInformationFromRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadColorRules()
-{
-	NColorRuleHelper::LoadColorRulesFromRegistry(m_pContainer->m_ColorRules);
-}
-
-void Explorerplusplus::CLoadSaveRegistry::LoadDialogStates()
-{
-	m_pContainer->LoadDialogStatesFromRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveGenericSettings()
-{
-	m_pContainer->SaveSettings();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveBookmarks()
-{
-	m_pContainer->SaveBookmarksToRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveTabs()
-{
-	m_pContainer->SaveTabSettingsToRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveDefaultColumns()
-{
-	m_pContainer->SaveDefaultColumnsToRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveApplicationToolbar()
-{
-	m_pContainer->SaveApplicationToolbarToRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveToolbarInformation()
-{
-	m_pContainer->SaveToolbarInformationToRegistry();
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveColorRules()
-{
-	NColorRuleHelper::SaveColorRulesToRegistry(m_pContainer->m_ColorRules);
-}
-
-void Explorerplusplus::CLoadSaveRegistry::SaveDialogStates()
-{
-	m_pContainer->SaveDialogStatesToRegistry();
 }

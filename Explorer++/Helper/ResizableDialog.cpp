@@ -1,16 +1,11 @@
-/******************************************************************
- *
- * Project: Helper
- * File: ResizableDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Updates the size/position of a set of controls within
  * a resizable dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "ResizableDialog.h"
@@ -29,7 +24,7 @@ CResizableDialog::CResizableDialog(HWND hDlg,
 
 	/* Loop through each of the controls and
 	find the delta's. */
-	for each(auto Control in ControlList)
+	for(const auto &Control : ControlList)
 	{
 		ControlInternal.iID			= Control.iID;
 		ControlInternal.Type		= Control.Type;
@@ -66,7 +61,7 @@ void CResizableDialog::UpdateControls(int iWidth,int iHeight)
 	HWND hCtrl;
 	RECT rc;
 
-	for each(auto Control in m_ControlList)
+	for(const auto &Control : m_ControlList)
 	{
 		hCtrl = GetDlgItem(m_hDlg,Control.iID);
 		GetWindowRect(hCtrl,&rc);

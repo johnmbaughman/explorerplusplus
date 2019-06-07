@@ -1,32 +1,30 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: MassRenameDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Provides support for the mass renaming of files.
  * The following special characters are supported:
  * /N	- Counter
  * /F	- Filename
  * /B	- Basename (filename without extension)
  * /E	- Extension
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ * /L	- Lowercase filename
+ * /U	- Uppercase filename
+ */
 
 #include "stdafx.h"
-#include <list>
-#include <regex>
-#include <iomanip>
+#include "MassRenameDialog.h"
 #include "Explorer++_internal.h"
 #include "MainImages.h"
-#include "MassRenameDialog.h"
 #include "MainResource.h"
+#include "../Helper/Macros.h"
 #include "../Helper/RegistrySettings.h"
 #include "../Helper/XMLSettings.h"
-#include "../Helper/Macros.h"
+#include <boost/algorithm/string.hpp>
+#include <iomanip>
+#include <list>
+#include <regex>
 
 
 const TCHAR CMassRenameDialogPersistentSettings::SETTINGS_KEY[] = _T("MassRename");
@@ -101,7 +99,7 @@ INT_PTR CMassRenameDialog::OnInitDialog()
 	int iItem = 0;
 
 	/* Add each file to the listview, along with its icon. */
-	for each(auto strFilename in m_FullFilenameList)
+	for(const auto &strFilename : m_FullFilenameList)
 	{
 		SHGetFileInfo(strFilename.c_str(),0,&shfi,
 			sizeof(SHFILEINFO),SHGFI_SYSICONINDEX);
@@ -196,7 +194,7 @@ INT_PTR CMassRenameDialog::OnCommand(WPARAM wParam,LPARAM lParam)
 				TCHAR szNewFilename[MAX_PATH];
 				int iItem = 0;
 
-				for each(auto strFilename in m_FullFilenameList)
+				for(const auto &strFilename : m_FullFilenameList)
 				{
 					StringCchCopy(szFilename,SIZEOF_ARRAY(szFilename),
 						strFilename.c_str());
@@ -254,6 +252,16 @@ INT_PTR CMassRenameDialog::OnCommand(WPARAM wParam,LPARAM lParam)
 					SendDlgItemMessage(m_hDlg,IDC_MASSRENAME_EDIT,EM_REPLACESEL,TRUE,
 						reinterpret_cast<LPARAM>(_T("/N")));
 					break;
+
+				case IDM_MASSRENAME_LCASE:
+					SendDlgItemMessage(m_hDlg,IDC_MASSRENAME_EDIT,EM_REPLACESEL,TRUE,
+						reinterpret_cast<LPARAM>(_T("/L")));
+					break;
+
+				case IDM_MASSRENAME_UCASE:
+					SendDlgItemMessage(m_hDlg,IDC_MASSRENAME_EDIT,EM_REPLACESEL,TRUE,
+						reinterpret_cast<LPARAM>(_T("/U")));
+					break;
 				}
 			}
 			break;
@@ -301,7 +309,7 @@ void CMassRenameDialog::OnOk()
 	std::list<CFileActionHandler::RenamedItem_t> RenamedItemList;
 	int iItem = 0;
 
-	for each (auto strOldFilename in m_FullFilenameList)
+	for(const auto &strOldFilename : m_FullFilenameList)
 	{
 		TCHAR szFilename[MAX_PATH];
 		StringCchCopy(szFilename,SIZEOF_ARRAY(szFilename),
@@ -398,6 +406,18 @@ void CMassRenameDialog::ProcessFileName(const std::wstring &strTarget,
 	{
 		strOutput.replace(iPos,2,pExt);
 	}
+
+	while((iPos = strOutput.find(_T("/L"))) != std::wstring::npos)
+	{
+		strOutput.replace(iPos,2,strFilename);
+		boost::to_lower(strOutput);
+	}
+
+	while((iPos = strOutput.find(_T("/U"))) != std::wstring::npos)
+	{
+		strOutput.replace(iPos,2,strFilename);
+		boost::to_upper(strOutput);
+	}
 }
 
 CMassRenameDialogPersistentSettings::CMassRenameDialogPersistentSettings() :
@@ -409,7 +429,7 @@ CDialogSettings(SETTINGS_KEY)
 
 CMassRenameDialogPersistentSettings::~CMassRenameDialogPersistentSettings()
 {
-	
+
 }
 
 CMassRenameDialogPersistentSettings& CMassRenameDialogPersistentSettings::GetInstance()
@@ -430,8 +450,8 @@ void CMassRenameDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 	NRegistrySettings::ReadDwordFromRegistry(hKey, SETTING_COLUMN_WIDTH_2, reinterpret_cast<DWORD *>(&m_iColumnWidth2));
 }
 
-void CMassRenameDialogPersistentSettings::SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
-	MSXML2::IXMLDOMElement *pParentNode)
+void CMassRenameDialogPersistentSettings::SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom,
+	IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_COLUMN_WIDTH_1, NXMLSettings::EncodeIntValue(m_iColumnWidth1));
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_COLUMN_WIDTH_2, NXMLSettings::EncodeIntValue(m_iColumnWidth2));

@@ -1,26 +1,17 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: CustomizeColorsDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the customize colors dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
-#include "MainImages.h"
 #include "CustomizeColorsDialog.h"
 #include "ColorRuleDialog.h"
+#include "Explorer++_internal.h"
+#include "MainImages.h"
 #include "MainResource.h"
 #include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
-#include "../Helper/WindowHelper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/WindowHelper.h"
 
 
 const TCHAR CCustomizeColorsDialogPersistentSettings::SETTINGS_KEY[] = _T("CustomizeColors");
@@ -88,7 +79,7 @@ INT_PTR CCustomizeColorsDialog::OnInitDialog()
 
 	int iItem = 0;
 
-	for each(auto ColorRule in *m_pColorRuleList)
+	for(const auto &ColorRule : *m_pColorRuleList)
 	{
 		InsertColorRuleIntoListView(hListView,ColorRule,iItem++);
 	}

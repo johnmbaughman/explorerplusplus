@@ -1,13 +1,6 @@
-/******************************************************************
-*
-* Project: Explorer++
-* File: BookmarkListView.cpp
-* License: GPL - See LICENSE in the top level directory
-*
-* Written by David Erceg
-* www.explorerplusplus.com
-*
-*****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "BookmarkListView.h"
@@ -107,7 +100,7 @@ int CBookmarkListView::InsertBookmarkItemIntoListView(const std::wstring &strNam
 	return iItem;
 }
 
-NBookmarkHelper::variantBookmark_t CBookmarkListView::GetBookmarkItemFromListView(CBookmarkFolder &ParentBookmarkFolder, int iItem)
+VariantBookmark &CBookmarkListView::GetBookmarkItemFromListView(CBookmarkFolder &ParentBookmarkFolder, int iItem)
 {
 	LVITEM lvi;
 	lvi.mask = LVIF_PARAM;
@@ -115,15 +108,15 @@ NBookmarkHelper::variantBookmark_t CBookmarkListView::GetBookmarkItemFromListVie
 	lvi.iSubItem = 0;
 	ListView_GetItem(m_hListView, &lvi);
 
-	NBookmarkHelper::variantBookmark_t variantBookmark = GetBookmarkItemFromListViewlParam(ParentBookmarkFolder, lvi.lParam);
+	VariantBookmark &variantBookmark = GetBookmarkItemFromListViewlParam(ParentBookmarkFolder, lvi.lParam);
 
 	return variantBookmark;
 }
 
-NBookmarkHelper::variantBookmark_t CBookmarkListView::GetBookmarkItemFromListViewlParam(CBookmarkFolder &ParentBookmarkFolder, LPARAM lParam)
+VariantBookmark &CBookmarkListView::GetBookmarkItemFromListViewlParam(CBookmarkFolder &ParentBookmarkFolder, LPARAM lParam)
 {
 	auto itr = m_mapID.find(static_cast<UINT>(lParam));
-	NBookmarkHelper::variantBookmark_t variantBookmark = NBookmarkHelper::GetBookmarkItem(ParentBookmarkFolder, itr->second);
+	VariantBookmark &variantBookmark = NBookmarkHelper::GetBookmarkItem(ParentBookmarkFolder, itr->second);
 
 	return variantBookmark;
 }

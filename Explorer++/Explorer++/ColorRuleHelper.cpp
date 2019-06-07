@@ -1,26 +1,16 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ColorRuleHelper.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides helper functionality for the color rules (which are
- * used to color files, based on their filename an/or
- * attributes).
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <vector>
-#include "Explorer++_internal.h"
 #include "ColorRuleHelper.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
+#include "../Helper/Macros.h"
 #include "../Helper/RegistrySettings.h"
 #include "../Helper/XMLSettings.h"
-#include "../Helper/Macros.h"
+#include <comdef.h>
+#include <vector>
 
 
 namespace
@@ -33,8 +23,8 @@ namespace
 	void LoadColorRulesFromRegistryInternal(HKEY hKey,std::vector<NColorRuleHelper::ColorRule_t> &ColorRules);
 	void SaveColorRulesToRegistryInternal(HKEY hKey,const NColorRuleHelper::ColorRule_t &ColorRule,int iCount);
 
-	void LoadColorRulesFromXMLInternal(MSXML2::IXMLDOMNode *pNode,std::vector<NColorRuleHelper::ColorRule_t> &ColorRules);
-	void SaveColorRulesToXMLInternal(MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pe,const NColorRuleHelper::ColorRule_t &ColorRule);
+	void LoadColorRulesFromXMLInternal(IXMLDOMNode *pNode,std::vector<NColorRuleHelper::ColorRule_t> &ColorRules);
+	void SaveColorRulesToXMLInternal(IXMLDOMDocument *pXMLDom,IXMLDOMElement *pe,const NColorRuleHelper::ColorRule_t &ColorRule);
 }
 
 std::vector<NColorRuleHelper::ColorRule_t> NColorRuleHelper::GetDefaultColorRules(HMODULE hLanguageModule)
@@ -128,7 +118,7 @@ void NColorRuleHelper::SaveColorRulesToRegistry(const std::vector<NColorRuleHelp
 	{
 		int iCount = 0;
 
-		for each(auto ColorRule in ColorRules)
+		for(const auto &ColorRule : ColorRules)
 		{
 			SaveColorRulesToRegistryInternal(hKey,ColorRule,iCount);
 			iCount++;
@@ -161,10 +151,10 @@ namespace
 	}
 }
 
-void NColorRuleHelper::LoadColorRulesFromXML(MSXML2::IXMLDOMDocument *pXMLDom,
+void NColorRuleHelper::LoadColorRulesFromXML(IXMLDOMDocument *pXMLDom,
 	std::vector<NColorRuleHelper::ColorRule_t> &ColorRules)
 {
-	MSXML2::IXMLDOMNode *pNode = NULL;
+	IXMLDOMNode *pNode = NULL;
 	BSTR bstr = NULL;
 
 	if(!pXMLDom)
@@ -188,11 +178,11 @@ clean:
 
 namespace
 {
-	void LoadColorRulesFromXMLInternal(MSXML2::IXMLDOMNode *pNode,std::vector<NColorRuleHelper::ColorRule_t> &ColorRules)
+	void LoadColorRulesFromXMLInternal(IXMLDOMNode *pNode,std::vector<NColorRuleHelper::ColorRule_t> &ColorRules)
 	{
-		MSXML2::IXMLDOMNamedNodeMap *am = NULL;
-		MSXML2::IXMLDOMNode *pAttributeNode = NULL;
-		MSXML2::IXMLDOMNode *pNextSibling = NULL;
+		IXMLDOMNamedNodeMap *am = NULL;
+		IXMLDOMNode *pAttributeNode = NULL;
+		IXMLDOMNode *pNextSibling = NULL;
 		NColorRuleHelper::ColorRule_t ColorRule;
 		BOOL bDescriptionFound = FALSE;
 		BOOL bFilenamePatternFound = FALSE;
@@ -275,10 +265,10 @@ namespace
 	}
 }
 
-void NColorRuleHelper::SaveColorRulesToXML(MSXML2::IXMLDOMDocument *pXMLDom,
-MSXML2::IXMLDOMElement *pRoot,const std::vector<NColorRuleHelper::ColorRule_t> &ColorRules)
+void NColorRuleHelper::SaveColorRulesToXML(IXMLDOMDocument *pXMLDom,
+IXMLDOMElement *pRoot,const std::vector<NColorRuleHelper::ColorRule_t> &ColorRules)
 {
-	MSXML2::IXMLDOMElement *pe = NULL;
+	IXMLDOMElement *pe = NULL;
 	BSTR bstr_wsnt = SysAllocString(L"\n\t");
 	BSTR bstr;
 
@@ -288,7 +278,7 @@ MSXML2::IXMLDOMElement *pRoot,const std::vector<NColorRuleHelper::ColorRule_t> &
 	pXMLDom->createElement(bstr,&pe);
 	SysFreeString(bstr);
 
-	for each(auto ColorRule in ColorRules)
+	for(const auto &ColorRule : ColorRules)
 	{
 		SaveColorRulesToXMLInternal(pXMLDom,pe,ColorRule);
 	}
@@ -304,10 +294,10 @@ MSXML2::IXMLDOMElement *pRoot,const std::vector<NColorRuleHelper::ColorRule_t> &
 
 namespace
 {
-	void SaveColorRulesToXMLInternal(MSXML2::IXMLDOMDocument *pXMLDom,
-		MSXML2::IXMLDOMElement *pe,const NColorRuleHelper::ColorRule_t &ColorRule)
+	void SaveColorRulesToXMLInternal(IXMLDOMDocument *pXMLDom,
+		IXMLDOMElement *pe,const NColorRuleHelper::ColorRule_t &ColorRule)
 	{
-		MSXML2::IXMLDOMElement *pParentNode = NULL;
+		IXMLDOMElement *pParentNode = NULL;
 		BSTR bstr_indent;
 		WCHAR wszIndent[128];
 		static int iIndent = 2;

@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Helper
- * File: IDataObject.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides an implementation of IDataObject.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <list>
@@ -52,8 +43,8 @@ public:
 
 private:
 
-	BOOL	DuplicateStorageMedium(STGMEDIUM *pstgDest,STGMEDIUM *pstgSrc,FORMATETC *pftc);
-	BOOL	DuplicateData(STGMEDIUM *pstgDest,STGMEDIUM *pstgSrc,FORMATETC *pftc);
+	BOOL	DuplicateStorageMedium(STGMEDIUM *pstgDest, const STGMEDIUM *pstgSrc, const FORMATETC *pftc);
+	BOOL	DuplicateData(STGMEDIUM *pstgDest, const STGMEDIUM *pstgSrc, const FORMATETC *pftc);
 
 	LONG							m_lRefCount;
 
@@ -87,7 +78,7 @@ CDataObject::CDataObject(FORMATETC *pFormatEtc,STGMEDIUM *pMedium,int count)
 
 CDataObject::~CDataObject()
 {
-	for each(auto dao in m_daoList)
+	for(auto dao : m_daoList)
 	{
 		ReleaseStgMedium(&dao.stg);
 	}
@@ -152,7 +143,7 @@ HRESULT __stdcall CDataObject::GetData(FORMATETC *pFormatEtc,STGMEDIUM *pMedium)
 		return DV_E_FORMATETC;
 	}
 
-	for each(auto dao in m_daoList)
+	for(const auto &dao : m_daoList)
 	{
 		if(dao.fe.cfFormat == pFormatEtc->cfFormat &&
 		   dao.fe.tymed & pFormatEtc->tymed &&
@@ -172,7 +163,7 @@ HRESULT __stdcall CDataObject::GetData(FORMATETC *pFormatEtc,STGMEDIUM *pMedium)
 	return DV_E_FORMATETC;
 }
 
-BOOL CDataObject::DuplicateStorageMedium(STGMEDIUM *pstgDest,STGMEDIUM *pstgSrc,FORMATETC *pftc)
+BOOL CDataObject::DuplicateStorageMedium(STGMEDIUM *pstgDest, const STGMEDIUM *pstgSrc, const FORMATETC *pftc)
 {
 	pstgDest->tymed = pstgSrc->tymed;
 	pstgDest->pUnkForRelease = NULL;
@@ -213,7 +204,7 @@ BOOL CDataObject::DuplicateStorageMedium(STGMEDIUM *pstgDest,STGMEDIUM *pstgSrc,
 	return success;
 }
 
-BOOL CDataObject::DuplicateData(STGMEDIUM *pstgDest,STGMEDIUM *pstgSrc,FORMATETC *pftc)
+BOOL CDataObject::DuplicateData(STGMEDIUM *pstgDest, const STGMEDIUM *pstgSrc, const FORMATETC *pftc)
 {
 	HANDLE hData = OleDuplicateData(pstgSrc->hGlobal,pftc->cfFormat,0);
 
@@ -263,7 +254,7 @@ HRESULT	__stdcall CDataObject::QueryGetData(FORMATETC *pFormatEtc)
 		return E_INVALIDARG;
 	}
 
-	for each(auto dao in m_daoList)
+	for(const auto &dao : m_daoList)
 	{
 		if(dao.fe.cfFormat == pFormatEtc->cfFormat &&
 		   dao.fe.tymed & pFormatEtc->tymed &&
@@ -331,7 +322,7 @@ HRESULT __stdcall CDataObject::EnumFormatEtc(DWORD dwDirection,IEnumFORMATETC **
 	{
 		std::list<FORMATETC> feList;
 
-		for each(auto dao in m_daoList)
+		for(const auto &dao : m_daoList)
 		{
 			feList.push_back(dao.fe);
 		}

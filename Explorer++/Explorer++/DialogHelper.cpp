@@ -1,35 +1,26 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: DialogHelper.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Dialog helper functionality.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++.h"
 #include "DialogHelper.h"
-#include "SearchDialog.h"
-#include "WildcardSelectDialog.h"
-#include "SetFileAttributesDialog.h"
-#include "RenameTabDialog.h"
-#include "MassRenameDialog.h"
-#include "FilterDialog.h"
+#include "AddBookmarkDialog.h"
+#include "Explorer++.h"
 #include "ColorRuleDialog.h"
 #include "CustomizeColorsDialog.h"
-#include "SplitFileDialog.h"
 #include "DestroyFilesDialog.h"
+#include "DisplayColoursDialog.h"
+#include "FilterDialog.h"
+#include "MassRenameDialog.h"
 #include "MergeFilesDialog.h"
+#include "RenameTabDialog.h"
+#include "SearchDialog.h"
 #include "SelectColumnsDialog.h"
 #include "SetDefaultColumnsDialog.h"
-#include "AddBookmarkDialog.h"
-#include "DisplayColoursDialog.h"
+#include "SetFileAttributesDialog.h"
+#include "SplitFileDialog.h"
 #include "UpdateCheckDialog.h"
+#include "WildcardSelectDialog.h"
 #include "../Helper/XMLSettings.h"
 
 
@@ -69,7 +60,7 @@ void Explorerplusplus::LoadDialogStatesFromRegistry(void)
 
 	if(ReturnValue == ERROR_SUCCESS)
 	{
-		for each(CDialogSettings *ds in DIALOG_SETTINGS)
+		for(CDialogSettings *ds : DIALOG_SETTINGS)
 		{
 			ds->LoadRegistrySettings(hKey);
 		}
@@ -86,7 +77,7 @@ void Explorerplusplus::SaveDialogStatesToRegistry(void)
 
 	if(ReturnValue == ERROR_SUCCESS)
 	{
-		for each(CDialogSettings *ds in DIALOG_SETTINGS)
+		for(CDialogSettings *ds : DIALOG_SETTINGS)
 		{
 			ds->SaveRegistrySettings(hKey);
 		}
@@ -95,12 +86,12 @@ void Explorerplusplus::SaveDialogStatesToRegistry(void)
 	}
 }
 
-void Explorerplusplus::LoadDialogStatesFromXML(MSXML2::IXMLDOMDocument *pXMLDom)
+void Explorerplusplus::LoadDialogStatesFromXML(IXMLDOMDocument *pXMLDom)
 {
-	MSXML2::IXMLDOMNodeList		*pNodes = NULL;
-	MSXML2::IXMLDOMNode			*pNode = NULL;
-	MSXML2::IXMLDOMNamedNodeMap	*am = NULL;
-	MSXML2::IXMLDOMNode			*pChildNode = NULL;
+	IXMLDOMNodeList		*pNodes = NULL;
+	IXMLDOMNode			*pNode = NULL;
+	IXMLDOMNamedNodeMap	*am = NULL;
+	IXMLDOMNode			*pChildNode = NULL;
 	BSTR						bstrName;
 	BSTR						bstrValue;
 	BSTR						bstr = NULL;
@@ -149,7 +140,7 @@ void Explorerplusplus::LoadDialogStatesFromXML(MSXML2::IXMLDOMDocument *pXMLDom)
 						pChildNode->get_nodeName(&bstrName);
 						pChildNode->get_text(&bstrValue);
 
-						for each(CDialogSettings *ds in DIALOG_SETTINGS)
+						for(CDialogSettings *ds : DIALOG_SETTINGS)
 						{
 							TCHAR settingsKey[64];
 							bool success = ds->GetSettingsKey(settingsKey, SIZEOF_ARRAY(settingsKey));
@@ -180,10 +171,10 @@ clean:
 	if (pNode) pNode->Release();
 }
 
-void Explorerplusplus::SaveDialogStatesToXML(MSXML2::IXMLDOMDocument *pXMLDom,
-MSXML2::IXMLDOMElement *pRoot)
+void Explorerplusplus::SaveDialogStatesToXML(IXMLDOMDocument *pXMLDom,
+IXMLDOMElement *pRoot)
 {
-	MSXML2::IXMLDOMElement	*pe = NULL;
+	IXMLDOMElement	*pe = NULL;
 	BSTR					bstr = NULL;
 	BSTR					bstr_wsnt = SysAllocString(L"\n\t");
 
@@ -194,7 +185,7 @@ MSXML2::IXMLDOMElement *pRoot)
 	SysFreeString(bstr);
 	bstr = NULL;
 
-	for each(CDialogSettings *ds in DIALOG_SETTINGS)
+	for(CDialogSettings *ds : DIALOG_SETTINGS)
 	{
 		ds->SaveXMLSettings(pXMLDom, pe);
 	}

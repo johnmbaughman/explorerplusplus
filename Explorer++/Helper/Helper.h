@@ -1,9 +1,14 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include <ShObjIdl.h>
 #include <windows.h>
 #include <winioctl.h>
 #include <list>
-#include <ShObjIdl.h>
+#include <string>
 
 struct LangAndCodePage
 {

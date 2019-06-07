@@ -1,29 +1,17 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: AboutDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Manages the 'About' dialog box.
- *
- * Notes:
- *  - Always center dialog. Position is not saved/loaded.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
-#include "Explorer++_internal.h"
 #include "AboutDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
 #include "Version.h"
-#include "../Helper/Helper.h"
 #include "../Helper/BaseDialog.h"
-#include "../Helper/WindowHelper.h"
+#include "../Helper/Helper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/WindowHelper.h"
+#include <list>
 
 
 CAboutDialog::CAboutDialog(HINSTANCE hInstance,int iResource,HWND hParent) :

@@ -1,31 +1,23 @@
-/******************************************************************
- *
- * Project: ShellBrowser
- * File: iFolderView.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Constructs/deconstructs the browser
- * object. Also contains some auxiliary
- * code.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <string>
 #include "IShellView.h"
+#include "Config.h"
 #include "iShellBrowser_internal.h"
-#include "../Helper/Helper.h"
-#include "../Helper/ShellHelper.h"
+#include "MainResource.h"
+#include "SortModes.h"
+#include "ViewModes.h"
 #include "../Helper/Controls.h"
-#include "../Helper/RegistrySettings.h"
+#include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/ShellHelper.h"
+#include <string>
 
-
-BOOL g_bInitialized = FALSE;
+int CShellBrowser::listViewParentSubclassIdCounter = 0;
 
 /* IUnknown interface members. */
 HRESULT __stdcall CShellBrowser::QueryInterface(REFIID iid, void **ppvObject)
@@ -64,42 +56,45 @@ ULONG __stdcall CShellBrowser::Release(void)
 	return m_iRefCount;
 }
 
-CShellBrowser *CShellBrowser::CreateNew(HWND hOwner,HWND hListView,
-	const InitialSettings_t *pSettings,HANDLE hIconThread,HANDLE hFolderSizeThread)
+CShellBrowser *CShellBrowser::CreateNew(int id, HINSTANCE resourceInstance, HWND hOwner, HWND hListView,
+	CachedIcons *cachedIcons, std::shared_ptr<const Config> config, const FolderSettings &folderSettings,
+	const InitialColumns &initialColumns)
 {
-	return new CShellBrowser(hOwner,hListView,pSettings,hIconThread,hFolderSizeThread);
+	return new CShellBrowser(id, resourceInstance, hOwner, hListView, cachedIcons, config,
+		folderSettings, initialColumns);
 }
 
-CShellBrowser::CShellBrowser(HWND hOwner,HWND hListView,
-const InitialSettings_t *pSettings,HANDLE hIconThread,
-HANDLE hFolderSizeThread) :
-m_hOwner(hOwner),
-m_hListView(hListView),
-m_hThread(hIconThread),
-m_hFolderSizeThread(hFolderSizeThread)
+CShellBrowser::CShellBrowser(int id, HINSTANCE resourceInstance, HWND hOwner, HWND hListView,
+	CachedIcons *cachedIcons, std::shared_ptr<const Config> config, const FolderSettings &folderSettings,
+	const InitialColumns &initialColumns) :
+	m_ID(id),
+	m_hResourceModule(resourceInstance),
+	m_hOwner(hOwner),
+	m_hListView(hListView),
+	m_cachedIcons(cachedIcons),
+	m_config(config),
+	m_folderSettings(folderSettings),
+	m_ControlPanelColumnList(*initialColumns.pControlPanelColumnList),
+	m_MyComputerColumnList(*initialColumns.pMyComputerColumnList),
+	m_MyNetworkPlacesColumnList(*initialColumns.pMyNetworkPlacesColumnList),
+	m_NetworkConnectionsColumnList(*initialColumns.pNetworkConnectionsColumnList),
+	m_PrintersColumnList(*initialColumns.pPrintersColumnList),
+	m_RealFolderColumnList(*initialColumns.pRealFolderColumnList),
+	m_RecycleBinColumnList(*initialColumns.pRecycleBinColumnList),
+	m_itemIDCounter(0),
+	m_columnThreadPool(1),
+	m_columnResultIDCounter(0),
+	m_itemImageThreadPool(1),
+	m_thumbnailResultIDCounter(0),
+	m_iconResultIDCounter(0),
+	m_infoTipsThreadPool(1),
+	m_infoTipResultIDCounter(0)
 {
 	m_iRefCount = 1;
 
 	InitializeDragDropHelpers();
 
-	AllocateInitialItemMemory();
-
-	m_pPathManager			= new CPathManager();
-
-	m_SortMode				= FSM_NAME;
-	m_ViewMode				= VM_ICONS;
-	m_bSortAscending		= TRUE;
-	m_bAutoArrange			= TRUE;
-	m_bShowInGroups			= FALSE;
-	m_bShowFriendlyDates	= TRUE;
 	m_bFolderVisited		= FALSE;
-	m_bApplyFilter			= FALSE;
-	m_bFilterCaseSensitive	= FALSE;
-	m_bGridlinesActive		= TRUE;
-	m_bShowHidden			= FALSE;
-	m_bShowExtensions		= TRUE;
-	m_bHideSystemFiles		= FALSE;
-	m_bHideLinkExtension	= FALSE;
 
 	m_bColumnsPlaced		= FALSE;
 	m_bOverFolder			= FALSE;
@@ -110,7 +105,6 @@ m_hFolderSizeThread(hFolderSizeThread)
 	m_iDirMonitorId			= -1;
 	m_pActiveColumnList		= NULL;
 	m_bPerformingDrag		= FALSE;
-	m_bNotifiedOfTermination	= FALSE;
 	m_nActiveColumns		= 0;
 	m_bNewItemCreated		= FALSE;
 	m_iDropped				= -1;
@@ -121,60 +115,70 @@ m_hFolderSizeThread(hFolderSizeThread)
 
 	m_PreviousSortColumnExists = false;
 
-	SetUserOptions(pSettings);
+	NListView::ListView_SetAutoArrange(m_hListView,m_folderSettings.autoArrange);
+	NListView::ListView_SetGridlines(m_hListView, m_config->globalFolderSettings.showGridlines);
 
-	NListView::ListView_SetAutoArrange(m_hListView,m_bAutoArrange);
-	NListView::ListView_SetGridlines(m_hListView,m_bGridlinesActive);
+	if (m_folderSettings.applyFilter)
+	{
+		NListView::ListView_SetBackgroundImage(m_hListView, IDB_FILTERINGAPPLIED);
+	}
+
+	NListView::ListView_ActivateOneClickSelect(m_hListView, m_config->globalFolderSettings.oneClickActivate,
+		m_config->globalFolderSettings.oneClickActivateHoverTime);
 
 	m_nAwaitingAdd = 0;
 
-	m_pItemMap = (int *)malloc(m_iCurrentAllocation * sizeof(int));
-
-	InitializeItemMap(0,m_iCurrentAllocation);
-
 	InitializeCriticalSection(&m_csDirectoryAltered);
-	InitializeCriticalSection(&m_column_cs);
-	InitializeCriticalSection(&m_folder_cs);
 
-	if(!g_bcsThumbnailInitialized)
+	m_ListViewSubclassed = SetWindowSubclass(hListView, ListViewProcStub, LISTVIEW_SUBCLASS_ID, reinterpret_cast<DWORD_PTR>(this));
+
+	HWND hParent = GetParent(hListView);
+
+	if (hParent != NULL)
 	{
-		InitializeCriticalSection(&g_csThumbnails);
-		g_bcsThumbnailInitialized = TRUE;
+		m_listViewParentSubclassId = listViewParentSubclassIdCounter++;
+		m_ListViewParentSubclassed = SetWindowSubclass(hParent, ListViewParentProcStub, m_listViewParentSubclassId, reinterpret_cast<DWORD_PTR>(this));
+	}
+	else
+	{
+		m_ListViewParentSubclassed = FALSE;
 	}
 
-	m_iFolderIcon = GetDefaultFolderIconIndex();
-	m_iFileIcon = GetDefaultFileIconIndex();
+	m_itemImageThreadPool.push([](int id) {
+		UNREFERENCED_PARAMETER(id);
 
-	if(!g_bInitialized)
-	{
-		g_nAPCsRan = 0;
-		g_nAPCsQueued = 0;
-		InitializeCriticalSection(&g_icon_cs);
-
-		g_bInitialized = TRUE;
-	}
-
-	m_hIconEvent = CreateEvent(NULL,TRUE,TRUE,NULL);
-	m_hColumnQueueEvent = CreateEvent(NULL,TRUE,TRUE,NULL);
-	m_hFolderQueueEvent = CreateEvent(NULL,TRUE,TRUE,NULL);
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	});
 }
 
 CShellBrowser::~CShellBrowser()
 {
-	EmptyIconFinderQueue();
-	EmptyThumbnailsQueue();
-	EmptyColumnQueue();
-	EmptyFolderQueue();
+	HWND hParent = GetParent(m_hListView);
 
-	/* Wait for any current processing to finish. */
-	WaitForSingleObject(m_hIconEvent,INFINITE);
+	if (m_ListViewParentSubclassed && hParent != NULL)
+	{
+		RemoveWindowSubclass(hParent, ListViewParentProcStub, m_listViewParentSubclassId);
+	}
+
+	if (m_ListViewSubclassed)
+	{
+		RemoveWindowSubclass(m_hListView, ListViewProcStub, LISTVIEW_SUBCLASS_ID);
+	}
+
+	m_columnThreadPool.clear_queue();
+	m_itemImageThreadPool.clear_queue();
+	m_infoTipsThreadPool.clear_queue();
+
+	m_itemImageThreadPool.push([](int id) {
+		UNREFERENCED_PARAMETER(id);
+
+		CoUninitialize();
+	});
 
 	/* Release the drag and drop helpers. */
 	m_pDropTargetHelper->Release();
 	m_pDragSourceHelper->Release();
 
-	DeleteCriticalSection(&m_folder_cs);
-	DeleteCriticalSection(&m_column_cs);
 	DeleteCriticalSection(&m_csDirectoryAltered);
 
 	int nItems = ListView_GetItemCount(m_hListView);
@@ -188,37 +192,27 @@ CShellBrowser::~CShellBrowser()
 
 		ListView_GetItem(m_hListView,&lvItem);
 
-		CoTaskMemFree(reinterpret_cast<LPVOID>(m_pExtraItemInfo[lvItem.lParam].pridl));
-
 		/* Also destroy the thumbnails imagelist... */
 	}
 
 	CoTaskMemFree(m_pidlDirectory);
-
-	delete m_pPathManager;
-
-	free(m_pItemMap);
-	free(m_pExtraItemInfo);
-	free(m_pwfdFiles);
 }
 
 BOOL CShellBrowser::GetAutoArrange(void) const
 {
-	return m_bAutoArrange;
+	return m_folderSettings.autoArrange;
 }
 
-BOOL CShellBrowser::ToggleAutoArrange(void)
+void CShellBrowser::SetAutoArrange(BOOL autoArrange)
 {
-	m_bAutoArrange = !m_bAutoArrange;
+	m_folderSettings.autoArrange = autoArrange;
 
-	NListView::ListView_SetAutoArrange(m_hListView, m_bAutoArrange);
-
-	return m_bAutoArrange;
+	NListView::ListView_SetAutoArrange(m_hListView, m_folderSettings.autoArrange);
 }
 
-UINT CShellBrowser::GetCurrentViewMode() const
+ViewMode CShellBrowser::GetViewMode() const
 {
-	return m_ViewMode;
+	return m_folderSettings.viewMode;
 }
 
 /* This function is only called on 'hard' view changes
@@ -226,35 +220,21 @@ UINT CShellBrowser::GetCurrentViewMode() const
 not called when a tab is first set up (in which case
 the view mode still needs to be setup), or when entering
 a folder. */
-void CShellBrowser::SetCurrentViewMode(UINT ViewMode)
+void CShellBrowser::SetViewMode(ViewMode viewMode)
 {
-	if(ViewMode == m_ViewMode)
+	if(viewMode == m_folderSettings.viewMode)
 	{
 		return;
 	}
 
-	if(m_ViewMode == VM_THUMBNAILS && ViewMode != VM_THUMBNAILS)
+	if(m_folderSettings.viewMode == +ViewMode::Thumbnails && viewMode != +ViewMode::Thumbnails)
 		RemoveThumbnailsView();
 
-	SetCurrentViewModeInternal(ViewMode);
+	SetViewModeInternal(viewMode);
 
-	switch(ViewMode)
+	switch(viewMode)
 	{
-		case VM_DETAILS:
-			{
-				int i = 0;
-
-				for(i = 0;i < m_nTotalItems;i++)
-					AddToColumnQueue(i);
-
-				QueueUserAPC(SetAllColumnDataAPC,m_hThread,(ULONG_PTR)this);
-
-				if(m_bShowFolderSizes)
-					QueueUserAPC(SetAllFolderSizeColumnDataAPC,m_hFolderSizeThread,(ULONG_PTR)this);
-			}
-			break;
-
-		case VM_TILES:
+		case ViewMode::Tiles:
 			SetTileViewInfo();
 			break;
 	}
@@ -265,13 +245,13 @@ This function also initializes any items needed to support
 the current view mode. This MUST be done within this
 function, as when a tab is first opened, the view settings
 will need to be initialized. */
-void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
+void CShellBrowser::SetViewModeInternal(ViewMode viewMode)
 {
 	DWORD dwStyle;
 
-	switch(ViewMode)
+	switch(viewMode)
 	{
-	case VM_EXTRALARGEICONS:
+	case ViewMode::ExtraLargeIcons:
 		{
 			IImageList *pImageList = NULL;
 
@@ -281,7 +261,7 @@ void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
 		}
 		break;
 
-	case VM_LARGEICONS:
+	case ViewMode::LargeIcons:
 		{
 			IImageList *pImageList = NULL;
 
@@ -292,14 +272,14 @@ void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
 		break;
 
 	/* Do nothing. This will setup the listview by itself. */
-	case VM_THUMBNAILS:
+	case ViewMode::Thumbnails:
 		break;
 
-	case VM_TILES:
-	case VM_ICONS:
-	case VM_SMALLICONS:
-	case VM_LIST:
-	case VM_DETAILS:
+	case ViewMode::Tiles:
+	case ViewMode::Icons:
+	case ViewMode::SmallIcons:
+	case ViewMode::List:
+	case ViewMode::Details:
 		{
 			IImageList *pImageList = NULL;
 
@@ -311,32 +291,32 @@ void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
 	}
 
 	/* Delete all the tile view columns. */
-	if(m_ViewMode == VM_TILES && ViewMode != VM_TILES)
+	if(m_folderSettings.viewMode == +ViewMode::Tiles && viewMode != +ViewMode::Tiles)
 		DeleteTileViewColumns();
 
-	switch(ViewMode)
+	switch(viewMode)
 	{
-		case VM_TILES:
+		case ViewMode::Tiles:
 			dwStyle = LV_VIEW_TILE;
 
 			InsertTileViewColumns();
 			break;
 
-		case VM_EXTRALARGEICONS:
-		case VM_LARGEICONS:
-		case VM_ICONS:
+		case ViewMode::ExtraLargeIcons:
+		case ViewMode::LargeIcons:
+		case ViewMode::Icons:
 			dwStyle = LV_VIEW_ICON;
 			break;
 
-		case VM_SMALLICONS:
+		case ViewMode::SmallIcons:
 			dwStyle = LV_VIEW_SMALLICON;
 			break;
 
-		case VM_LIST:
+		case ViewMode::List:
 			dwStyle = LV_VIEW_LIST;
 			break;
 
-		case VM_DETAILS:
+		case ViewMode::Details:
 			dwStyle = LV_VIEW_DETAILS;
 
 			if(!m_bColumnsPlaced)
@@ -346,7 +326,7 @@ void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
 			}
 			break;
 
-		case VM_THUMBNAILS:
+		case ViewMode::Thumbnails:
 			dwStyle = LV_VIEW_ICON;
 
 			if(!m_bThumbnailsSetup)
@@ -355,45 +335,29 @@ void CShellBrowser::SetCurrentViewModeInternal(UINT ViewMode)
 
 		default:
 			dwStyle = LV_VIEW_ICON;
-			ViewMode = VM_ICONS;
+			viewMode = ViewMode::Icons;
 			break;
 	}
 
-	m_ViewMode = ViewMode;
+	m_folderSettings.viewMode = viewMode;
 
-	if(ViewMode != VM_DETAILS)
-		NListView::ListView_SetGridlines(m_hListView,FALSE);
-	else
-		NListView::ListView_SetGridlines(m_hListView,m_bGridlinesActive);
+	if (viewMode != +ViewMode::Details)
+	{
+		m_columnThreadPool.clear_queue();
+		m_columnResults.clear();
+	}
 
 	SendMessage(m_hListView,LVM_SETVIEW,dwStyle,0);
 }
 
-UINT CShellBrowser::GetSortMode() const
+SortMode CShellBrowser::GetSortMode() const
 {
-	return m_SortMode;
+	return m_folderSettings.sortMode;
 }
 
-void CShellBrowser::SetSortMode(UINT SortMode)
+void CShellBrowser::SetSortMode(SortMode sortMode)
 {
-	m_SortMode	= SortMode;
-}
-
-BOOL CShellBrowser::IsGroupViewEnabled(void) const
-{
-	return m_bShowInGroups;
-}
-
-void CShellBrowser::InitializeItemMap(int iStart,int iEnd)
-{
-	int i = 0;
-
-	for(i = iStart;i < iEnd;i++)
-	{
-		m_pItemMap[i] = 0;
-	}
-
-	m_iCachedPosition = 0;
+	m_folderSettings.sortMode = sortMode;
 }
 
 HRESULT CShellBrowser::InitializeDragDropHelpers(void)
@@ -417,127 +381,19 @@ HRESULT CShellBrowser::InitializeDragDropHelpers(void)
 	return hr;
 }
 
-void CShellBrowser::SetUserOptions(const InitialSettings_t *is)
-{
-	m_bAutoArrange			= is->bAutoArrange;
-	m_bGridlinesActive		= is->bGridlinesActive;
-	m_bShowHidden			= is->bShowHidden;
-	m_bShowInGroups			= is->bShowInGroups;
-	m_bSortAscending		= is->bSortAscending;
-	m_SortMode				= is->SortMode;
-	m_ViewMode				= is->ViewMode;
-	m_bApplyFilter			= is->bApplyFilter;
-	m_bFilterCaseSensitive	= is->bFilterCaseSensitive;
-	m_bShowFolderSizes		= is->bShowFolderSizes;
-	m_bDisableFolderSizesNetworkRemovable = is->bDisableFolderSizesNetworkRemovable;
-	m_bHideSystemFiles		= is->bHideSystemFiles;
-	m_bHideLinkExtension	= is->bHideLinkExtension;
-	m_bForceSize			= is->bForceSize;
-	m_SizeDisplayFormat		= is->sdf;
-
-	StringCchCopy(m_szFilter,SIZEOF_ARRAY(m_szFilter),is->szFilter);
-
-	m_ControlPanelColumnList = *is->pControlPanelColumnList;
-	m_MyComputerColumnList = *is->pMyComputerColumnList;
-	m_MyNetworkPlacesColumnList = *is->pMyNetworkPlacesColumnList;
-	m_NetworkConnectionsColumnList = *is->pNetworkConnectionsColumnList;
-	m_PrintersColumnList = *is->pPrintersColumnList;
-	m_RealFolderColumnList = *is->pRealFolderColumnList;
-	m_RecycleBinColumnList = *is->pRecycleBinColumnList;
-
-	NListView::ListView_SetGridlines(m_hListView,m_bGridlinesActive);
-}
-
-void CShellBrowser::SetGlobalSettings(const GlobalSettings_t *gs)
-{
-	m_bShowExtensions		= gs->bShowExtensions;
-	m_bShowFriendlyDates	= gs->bShowFriendlyDates;
-	m_bShowFolderSizes		= gs->bShowFolderSizes;
-}
-
-int CShellBrowser::GetId(void) const
+int CShellBrowser::GetId() const
 {
 	return m_ID;
 }
 
-void CShellBrowser::SetId(int ID)
+void CShellBrowser::OnGridlinesSettingChanged()
 {
-	m_ID = ID;
-}
-
-void CShellBrowser::AllocateInitialItemMemory(void)
-{
-	m_pwfdFiles			= (WIN32_FIND_DATA *)malloc(DEFAULT_MEM_ALLOC * sizeof(WIN32_FIND_DATA));
-	m_pExtraItemInfo	= (CItemObject *)malloc(DEFAULT_MEM_ALLOC * sizeof(CItemObject));
-
-	m_iCurrentAllocation = DEFAULT_MEM_ALLOC;
-}
-
-void CShellBrowser::ToggleGridlines(void)
-{
-	m_bGridlinesActive = !m_bGridlinesActive;
-
-	NListView::ListView_SetGridlines(m_hListView,m_bGridlinesActive);
-}
-
-BOOL CShellBrowser::QueryGridlinesActive(void) const
-{
-	return m_bGridlinesActive;
-}
-
-void CShellBrowser::SetResourceModule(HINSTANCE hResourceModule)
-{
-	m_hResourceModule = hResourceModule;
+	NListView::ListView_SetGridlines(m_hListView, m_config->globalFolderSettings.showGridlines);
 }
 
 HRESULT CShellBrowser::Refresh()
 {
-	return BrowseFolder(m_pidlDirectory,SBSP_SAMEBROWSER|SBSP_ABSOLUTE|SBSP_WRITENOHISTORY);
-}
-
-void CShellBrowser::SetHideSystemFiles(BOOL bHideSystemFiles)
-{
-	m_bHideSystemFiles = bHideSystemFiles;
-}
-
-void CShellBrowser::SetShowExtensions(BOOL bShowExtensions)
-{
-	m_bShowExtensions = bShowExtensions;
-}
-
-void CShellBrowser::SetHideLinkExtension(BOOL bHideLinkExtension)
-{
-	m_bHideLinkExtension = bHideLinkExtension;
-}
-
-void CShellBrowser::SetShowFolderSizes(BOOL bShowFolderSizes)
-{
-	m_bShowFolderSizes = bShowFolderSizes;
-}
-
-void CShellBrowser::SetDisableFolderSizesNetworkRemovable(BOOL bDisableFolderSizesNetworkRemovable)
-{
-	m_bDisableFolderSizesNetworkRemovable = bDisableFolderSizesNetworkRemovable;
-}
-
-void CShellBrowser::SetShowFriendlyDates(BOOL bShowFriendlyDates)
-{
-	m_bShowFriendlyDates = bShowFriendlyDates;
-}
-
-void CShellBrowser::SetInsertSorted(BOOL bInsertSorted)
-{
-	m_bInsertSorted = bInsertSorted;
-}
-
-void CShellBrowser::SetForceSize(BOOL bForceSize)
-{
-	m_bForceSize = bForceSize;
-}
-
-void CShellBrowser::SetSizeDisplayFormat(SizeDisplayFormat_t sdf)
-{
-	m_SizeDisplayFormat = sdf;
+	return BrowseFolder(m_pidlDirectory,SBSP_ABSOLUTE|SBSP_WRITENOHISTORY);
 }
 
 void CShellBrowser::InsertTileViewColumns(void)
@@ -620,17 +476,17 @@ void CShellBrowser::SetTileViewItemInfo(int iItem,int iItemInternal)
 
 	ListView_SetItemText(m_hListView,iItem,1,shfi.szTypeName);
 
-	if((m_pwfdFiles[iItemInternal].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) !=
+	if((m_itemInfoMap.at(iItemInternal).wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) !=
 		FILE_ATTRIBUTE_DIRECTORY)
 	{
 		TCHAR			lpszFileSize[32];
 		ULARGE_INTEGER	lFileSize;
 
-		lFileSize.LowPart = m_pwfdFiles[iItemInternal].nFileSizeLow;
-		lFileSize.HighPart = m_pwfdFiles[iItemInternal].nFileSizeHigh;
+		lFileSize.LowPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeLow;
+		lFileSize.HighPart = m_itemInfoMap.at(iItemInternal).wfd.nFileSizeHigh;
 
 		FormatSizeString(lFileSize,lpszFileSize,SIZEOF_ARRAY(lpszFileSize),
-			m_bForceSize,m_SizeDisplayFormat);
+			m_config->globalFolderSettings.forceSize, m_config->globalFolderSettings.sizeDisplayFormat);
 
 		ListView_SetItemText(m_hListView,iItem,2,lpszFileSize);
 	}

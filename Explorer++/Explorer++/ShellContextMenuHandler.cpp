@@ -1,16 +1,11 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ShellContextMenuHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Handles shell context menus (such as file
  * context menus, and the new menu).
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "Explorer++.h"
@@ -86,7 +81,7 @@ BOOL Explorerplusplus::HandleShellMenuItem(LPCITEMIDLIST pidlParent,
 		{
 			LPITEMIDLIST pidlComplete = NULL;
 
-			for each(auto pidl in pidlItemList)
+			for(const auto &pidl : pidlItemList)
 			{
 				pidlComplete = ILCombine(pidlParent,pidl);
 
@@ -169,7 +164,7 @@ void Explorerplusplus::HandleCustomMenuItem(LPCITEMIDLIST pidlParent,
 				}
 
 				GetDisplayName(pidlComplete,szParsingPath,SIZEOF_ARRAY(szParsingPath),SHGDN_FORPARSING);
-				BrowseFolder(szParsingPath,SBSP_ABSOLUTE,TRUE,TRUE,FALSE);
+				CreateNewTab(szParsingPath, TabSettings(_selected = true));
 
 				m_bTreeViewOpenInNewTab = TRUE;
 
@@ -177,10 +172,4 @@ void Explorerplusplus::HandleCustomMenuItem(LPCITEMIDLIST pidlParent,
 			}
 			break;
 	}
-}
-
-HRESULT Explorerplusplus::ShowMultipleFileProperties(LPITEMIDLIST pidlDirectory,
-	LPCITEMIDLIST *ppidl, int nFiles) const
-{
-	return ExecuteActionFromContextMenu(pidlDirectory, ppidl, m_hContainer, nFiles, _T("properties"), 0);
 }

@@ -1,26 +1,18 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: FilterDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Filter' dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
+#include "FilterDialog.h"
 #include "Explorer++_internal.h"
 #include "MainImages.h"
-#include "FilterDialog.h"
 #include "MainResource.h"
+#include "ShellBrowser/iShellView.h"
 #include "../Helper/Helper.h"
+#include "../Helper/Macros.h"
 #include "../Helper/RegistrySettings.h"
 #include "../Helper/XMLSettings.h"
-#include "../Helper/Macros.h"
+#include <list>
 
 
 const TCHAR CFilterDialogPersistentSettings::SETTINGS_KEY[] = _T("Filter");
@@ -57,7 +49,7 @@ INT_PTR CFilterDialog::OnInitDialog()
 
 	SetFocus(hComboBox);
 
-	for each(auto strFilter in m_pfdps->m_FilterList)
+	for(const auto &strFilter : m_pfdps->m_FilterList)
 	{
 		SendMessage(hComboBox,CB_ADDSTRING,static_cast<WPARAM>(-1),
 			reinterpret_cast<LPARAM>(strFilter.c_str()));
@@ -143,10 +135,10 @@ void CFilterDialog::OnOk()
 
 	int iBufSize = GetWindowTextLength(hComboBox);
 
-	TCHAR *pszFilter = new TCHAR[iBufSize + 1];
+	auto filter = std::make_unique<TCHAR[]>(iBufSize + 1);
 
 	SendMessage(hComboBox,WM_GETTEXT,iBufSize + 1,
-		reinterpret_cast<LPARAM>(pszFilter));
+		reinterpret_cast<LPARAM>(filter.get()));
 
 	bool bFound = false;
 
@@ -155,7 +147,7 @@ void CFilterDialog::OnOk()
 	Otherwise, insert it at the start. */
 	for(auto itr = m_pfdps->m_FilterList.begin();itr != m_pfdps->m_FilterList.end();itr++)
 	{
-		if(lstrcmp(pszFilter,itr->c_str()) == 0)
+		if(lstrcmp(filter.get(),itr->c_str()) == 0)
 		{
 			std::iter_swap(itr,m_pfdps->m_FilterList.begin());
 
@@ -166,18 +158,16 @@ void CFilterDialog::OnOk()
 
 	if(!bFound)
 	{
-		m_pfdps->m_FilterList.push_front(pszFilter);
+		m_pfdps->m_FilterList.push_front(filter.get());
 	}
 
 	m_pexpp->GetActiveShellBrowser()->SetFilterCaseSensitive(IsDlgButtonChecked(
 		m_hDlg,IDC_FILTERS_CASESENSITIVE) == BST_CHECKED);
 
-	m_pexpp->GetActiveShellBrowser()->SetFilter(pszFilter);
+	m_pexpp->GetActiveShellBrowser()->SetFilter(filter.get());
 
 	if(!m_pexpp->GetActiveShellBrowser()->GetFilterStatus())
 		m_pexpp->GetActiveShellBrowser()->SetFilterStatus(TRUE);
-
-	delete[] pszFilter;
 
 	EndDialog(m_hDlg,1);
 }
@@ -222,7 +212,7 @@ void CFilterDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 }
 
 void CFilterDialogPersistentSettings::SaveExtraXMLSettings(
-	MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pParentNode)
+	IXMLDOMDocument *pXMLDom,IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddStringListToNode(pXMLDom, pParentNode, SETTING_FILTER_LIST, m_FilterList);
 }

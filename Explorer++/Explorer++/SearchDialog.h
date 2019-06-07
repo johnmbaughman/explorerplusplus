@@ -1,17 +1,23 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
-#include <list>
-#include <vector>
-#include <string>
-#include <regex>
-#include <unordered_map>
-#include <boost/circular_buffer.hpp>
+#include "CoreInterface.h"
+#include "TabContainerInterface.h"
 #include "../Helper/BaseDialog.h"
 #include "../Helper/DialogSettings.h"
-#include "../Helper/ReferenceCount.h"
 #include "../Helper/FileContextMenuManager.h"
-
-#import <msxml3.dll> raw_interfaces_only
+#include "../Helper/ReferenceCount.h"
+#include <boost/circular_buffer.hpp>
+#include <MsXml2.h>
+#include <objbase.h>
+#include <list>
+#include <regex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 class CSearchDialog;
 
@@ -70,7 +76,7 @@ private:
 	void						SaveExtraRegistrySettings(HKEY hKey);
 	void						LoadExtraRegistrySettings(HKEY hKey);
 
-	void						SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	void						SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	void						LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	template <typename T> void	CircularBufferToList(const boost::circular_buffer<T> &cb,std::list<T> &list);
@@ -132,7 +138,7 @@ class CSearchDialog : public CBaseDialog, public IFileContextMenuExternal
 {
 public:
 
-	CSearchDialog(HINSTANCE hInstance,int iResource,HWND hParent,TCHAR *szSearchDirectory,IExplorerplusplus *pexpp);
+	CSearchDialog(HINSTANCE hInstance, int iResource, HWND hParent, TCHAR *szSearchDirectory, IExplorerplusplus *pexpp, TabContainerInterface *tabContainer);
 	~CSearchDialog();
 
 	/* IFileContextMenuExternal methods. */
@@ -194,6 +200,7 @@ private:
 	BOOL						m_bSetSearchTimer;
 
 	IExplorerplusplus			*m_pexpp;
+	TabContainerInterface		*m_tabContainer;
 
 	CSearchDialogPersistentSettings	*m_sdps;
 };

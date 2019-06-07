@@ -1,28 +1,21 @@
-/******************************************************************
-*
-* Project: Explorer++
-* File: MainMenuHandler.cpp
-* License: GPL - See LICENSE in the top level directory
-*
-* Handles some of the main menu entries (which might also be
-* invoked through other means, such as via keyboard accelerators).
-*
-* Written by David Erceg
-* www.explorerplusplus.com
-*
-******************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
 #include "AboutDialog.h"
+#include "Config.h"
 #include "CustomizeColorsDialog.h"
 #include "DestroyFilesDialog.h"
 #include "DisplayColoursDialog.h"
+#include "FileProgressSink.h"
 #include "FilterDialog.h"
 #include "HelpFileMissingDialog.h"
 #include "IModelessDialogNotification.h"
 #include "MergeFilesDialog.h"
 #include "ModelessDialogs.h"
+#include "ScriptingDialog.h"
 #include "SearchDialog.h"
 #include "SplitFileDialog.h"
 #include "UpdateCheckDialog.h"
@@ -31,7 +24,9 @@
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/ProcessHelper.h"
 #include "../Helper/ShellHelper.h"
+#include <boost/scope_exit.hpp>
 
+#pragma warning(disable:4459) // declaration of 'boost_scope_exit_aux_args' hides global declaration
 
 void Explorerplusplus::OnChangeDisplayColors()
 {
@@ -62,7 +57,7 @@ void Explorerplusplus::OnMergeFiles()
 	}
 
 	CMergeFilesDialog CMergeFilesDialog(m_hLanguageModule, IDD_MERGEFILES,
-		m_hContainer, szCurrentDirectory, FullFilenameList, m_bShowFriendlyDatesGlobal);
+		m_hContainer, szCurrentDirectory, FullFilenameList, m_config->globalFolderSettings.showFriendlyDates);
 	CMergeFilesDialog.ShowModalDialog();
 }
 
@@ -93,7 +88,7 @@ void Explorerplusplus::OnDestroyFiles()
 	}
 
 	CDestroyFilesDialog CDestroyFilesDialog(m_hLanguageModule, IDD_DESTROYFILES,
-		m_hContainer, FullFilenameList, m_bShowFriendlyDatesGlobal);
+		m_hContainer, FullFilenameList, m_config->globalFolderSettings.showFriendlyDates);
 	CDestroyFilesDialog.ShowModalDialog();
 }
 
@@ -110,7 +105,7 @@ void Explorerplusplus::OnSearch()
 		TCHAR szCurrentDirectory[MAX_PATH];
 		m_pActiveShellBrowser->QueryCurrentDirectory(SIZEOF_ARRAY(szCurrentDirectory), szCurrentDirectory);
 
-		CSearchDialog *SearchDialog = new CSearchDialog(m_hLanguageModule, IDD_SEARCH, m_hContainer, szCurrentDirectory, this);
+		CSearchDialog *SearchDialog = new CSearchDialog(m_hLanguageModule, IDD_SEARCH, m_hContainer, szCurrentDirectory, this, this);
 		g_hwndSearch = SearchDialog->ShowModelessDialog(new CModelessDialogNotification());
 	}
 	else
@@ -127,6 +122,19 @@ void Explorerplusplus::OnCustomizeColors()
 	/* Causes the active listview to redraw (therefore
 	applying any updated color schemes). */
 	InvalidateRect(m_hActiveListView, NULL, FALSE);
+}
+
+void Explorerplusplus::OnRunScript()
+{
+	if (g_hwndRunScript == NULL)
+	{
+		ScriptingDialog *scriptingDialog = new ScriptingDialog(m_hLanguageModule, IDD_SCRIPTING, m_hContainer, this);
+		g_hwndRunScript = scriptingDialog->ShowModelessDialog(new CModelessDialogNotification());
+	}
+	else
+	{
+		SetFocus(g_hwndRunScript);
+	}
 }
 
 void Explorerplusplus::OnShowOptions()
@@ -199,26 +207,37 @@ void Explorerplusplus::OnSaveDirectoryListing() const
 
 void Explorerplusplus::OnCreateNewFolder()
 {
-	TCHAR			szNewFolderName[32768];
-	LPITEMIDLIST	pidlItem = NULL;
-	HRESULT			hr;
+	PIDLPointer pidlDirectory(m_pActiveShellBrowser->QueryCurrentDirectoryIdl());
 
-	hr = CreateNewFolder(m_CurrentDirectory, szNewFolderName, SIZEOF_ARRAY(szNewFolderName));
+	IShellItem *directoryShellItem = nullptr;
+	HRESULT hr = SHCreateItemFromIDList(pidlDirectory.get(), IID_PPV_ARGS(&directoryShellItem));
 
-	if(SUCCEEDED(hr))
+	if (FAILED(hr))
 	{
+		return;
+	}
+
+	BOOST_SCOPE_EXIT(directoryShellItem) {
+		directoryShellItem->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	FileProgressSink *sink = FileProgressSink::CreateNew();
+	sink->SetPostNewItemObserver([this] (PIDLIST_ABSOLUTE pidl) {
 		m_bCountingDown = TRUE;
 		NListView::ListView_SelectAllItems(m_hActiveListView, FALSE);
 		SetFocus(m_hActiveListView);
 
-		GetIdlFromParsingName(szNewFolderName, &pidlItem);
-		m_pActiveShellBrowser->QueueRename((LPITEMIDLIST) pidlItem);
+		m_pActiveShellBrowser->QueueRename(pidl);
+	});
 
-		CoTaskMemFree(pidlItem);
-	}
-	else
+	TCHAR newFolderName[128];
+	LoadString(m_hLanguageModule, IDS_NEW_FOLDER_NAME, newFolderName, SIZEOF_ARRAY(newFolderName));
+	hr = NFileOperations::CreateNewFolder(directoryShellItem, newFolderName, sink);
+	sink->Release();
+
+	if(FAILED(hr))
 	{
-		TCHAR	szTemp[512];
+		TCHAR szTemp[512];
 
 		LoadString(m_hLanguageModule, IDS_NEWFOLDERERROR, szTemp,
 			SIZEOF_ARRAY(szTemp));
@@ -250,7 +269,7 @@ void Explorerplusplus::OnResolveLink()
 			StringCchCopy(szPath, SIZEOF_ARRAY(szPath), szFullFileName);
 			PathRemoveFileSpec(szPath);
 
-			hr = BrowseFolder(szPath, SBSP_ABSOLUTE, TRUE, TRUE, FALSE);
+			hr = CreateNewTab(szPath, TabSettings(_selected = true));
 
 			if(SUCCEEDED(hr))
 			{

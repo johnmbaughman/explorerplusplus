@@ -1,10 +1,15 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
-#include <list>
-#include <string>
 #include "../Helper/BaseDialog.h"
 #include "../Helper/DialogSettings.h"
 #include "../Helper/ReferenceCount.h"
+#include <list>
+#include <string>
+#include <unordered_map>
 
 class CSplitFileDialog;
 
@@ -33,7 +38,7 @@ private:
 	void			SaveExtraRegistrySettings(HKEY hKey);
 	void			LoadExtraRegistrySettings(HKEY hKey);
 
-	void			SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	void			SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	void			LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	std::wstring	m_strSplitSize;

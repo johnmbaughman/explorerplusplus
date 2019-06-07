@@ -1,10 +1,14 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include <objbase.h>
+#include <MsXml2.h>
 #include <list>
 #include <string>
 #include "Macros.h"
-
-#import <msxml3.dll> raw_interfaces_only
 
 class CDialogSettings
 {
@@ -16,8 +20,8 @@ public:
 	void			SaveRegistrySettings(HKEY hParentKey);
 	void			LoadRegistrySettings(HKEY hParentKey);
 
-	void			SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pe);
-	void			LoadXMLSettings(MSXML2::IXMLDOMNamedNodeMap *pam,long lChildNodes);
+	void			SaveXMLSettings(IXMLDOMDocument *pXMLDom,IXMLDOMElement *pe);
+	void			LoadXMLSettings(IXMLDOMNamedNodeMap *pam,long lChildNodes);
 
 	bool			GetSettingsKey(TCHAR *out, size_t cchMax) const;
 
@@ -41,7 +45,7 @@ private:
 	virtual void	SaveExtraRegistrySettings(HKEY hKey);
 	virtual void	LoadExtraRegistrySettings(HKEY hKey);
 
-	virtual void	SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	virtual void	SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	virtual void	LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	const std::wstring m_szSettingsKey;

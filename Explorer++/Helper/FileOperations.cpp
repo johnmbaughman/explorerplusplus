@@ -1,27 +1,20 @@
-/******************************************************************
- *
- * Project: Helper
- * File: FileOperations.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides a set of file operation functions.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
-#include <sstream>
 #include "FileOperations.h"
+#include "DriveInfo.h"
 #include "Helper.h"
 #include "iDataObject.h"
+#include "Macros.h"
 #include "ShellHelper.h"
 #include "StringHelper.h"
-#include "DriveInfo.h"
-#include "Macros.h"
+#include <boost/scope_exit.hpp>
+#include <list>
+#include <sstream>
 
+#pragma warning(disable:4459) // declaration of 'boost_scope_exit_aux_args' hides global declaration
 
 enum PasteType
 {
@@ -32,97 +25,225 @@ enum PasteType
 int PasteFilesFromClipboardSpecial(const TCHAR *szDestination, PasteType pasteType);
 BOOL GetFileClusterSize(const std::wstring &strFilename, PLARGE_INTEGER lpRealFileSize);
 
-BOOL NFileOperations::RenameFile(const std::wstring &strOldFilename,
-	const std::wstring &strNewFilename)
+HRESULT NFileOperations::RenameFile(IShellItem *item, const std::wstring &newName)
 {
-	TCHAR *pszOldFilename = new TCHAR[strOldFilename.size() + 2];
-	TCHAR *pszNewFilename = new TCHAR[strNewFilename.size() + 2];
+	IFileOperation *fo;
+	HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&fo));
 
-	StringCchCopy(pszOldFilename,strOldFilename.size() + 2,strOldFilename.c_str());
-	pszOldFilename[lstrlen(pszOldFilename) + 1] = '\0';
-	StringCchCopy(pszNewFilename,strNewFilename.size() + 2,strNewFilename.c_str());
-	pszNewFilename[lstrlen(pszNewFilename) + 1] = '\0';
+	if (FAILED(hr))
+	{
+		return hr;
+	}
 
-	SHFILEOPSTRUCT shfo;
-	shfo.hwnd	= NULL;
-	shfo.wFunc	= FO_RENAME;
-	shfo.pFrom	= pszOldFilename;
-	shfo.pTo	= pszNewFilename;
-	shfo.fFlags	= FOF_ALLOWUNDO | FOF_SILENT;
-	BOOL bRes = (!SHFileOperation(&shfo) && !shfo.fAnyOperationsAborted);
+	BOOST_SCOPE_EXIT(fo) {
+		fo->Release();
+	} BOOST_SCOPE_EXIT_END
 
-	delete[] pszOldFilename;
-	delete[] pszNewFilename;
+	hr = fo->SetOperationFlags(FOF_ALLOWUNDO | FOF_SILENT);
 
-	return bRes;
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = fo->RenameItem(item, newName.c_str(), nullptr);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = fo->PerformOperations();
+
+	return hr;
 }
 
-BOOL NFileOperations::DeleteFiles(HWND hwnd,const std::list<std::wstring> &FullFilenameList,
-	BOOL bPermanent,BOOL bSilent)
+HRESULT NFileOperations::DeleteFiles(HWND hwnd, std::vector<LPCITEMIDLIST> &pidls,
+	bool permanent, bool silent)
 {
-	TCHAR *pszFullFilenames = NFileOperations::BuildFilenameList(FullFilenameList);
+	IFileOperation *fo;
+	HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&fo));
 
-	FILEOP_FLAGS fFlags = 0;
-
-	if(!bPermanent)
+	if (FAILED(hr))
 	{
-		fFlags = FOF_ALLOWUNDO;
+		return hr;
 	}
 
-	if(bSilent)
+	BOOST_SCOPE_EXIT(fo) {
+		fo->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	hr = fo->SetOwnerWindow(hwnd);
+
+	if (FAILED(hr))
 	{
-		fFlags |= FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+		return hr;
 	}
 
-	SHFILEOPSTRUCT shfo;
-	shfo.hwnd					= hwnd;
-	shfo.wFunc					= FO_DELETE;
-	shfo.pFrom					= pszFullFilenames;
-	shfo.pTo					= NULL;
-	shfo.fFlags					= fFlags;
-	shfo.fAnyOperationsAborted	= NULL;
-	shfo.hNameMappings			= NULL;
-	shfo.lpszProgressTitle		= NULL;
-	BOOL bRes = (!SHFileOperation(&shfo) && !shfo.fAnyOperationsAborted);
+	DWORD flags = 0;
 
-	free(pszFullFilenames);
-
-	return bRes;
-}
-
-BOOL NFileOperations::CopyFilesToFolder(HWND hOwner,const std::wstring &strTitle,
-	const std::list<std::wstring> &FullFilenameList,BOOL bMove)
-{
-	std::wstring strOutputFilename;
-	BOOL bRes = NFileOperations::CreateBrowseDialog(hOwner,strTitle.c_str(),strOutputFilename);
-
-	if(!bRes)
+	if (!permanent)
 	{
-		return FALSE;
+		flags |= FOF_ALLOWUNDO;
 	}
 
-	TCHAR *pszFullFilenames = NFileOperations::BuildFilenameList(FullFilenameList);
-
-	SHFILEOPSTRUCT shfo;
-
-	if(bMove)
+	if (silent)
 	{
-		shfo.wFunc = FO_MOVE;
+		flags |= FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI;
 	}
 	else
 	{
-		shfo.wFunc = FO_COPY;
+		flags |= FOF_WANTNUKEWARNING;
 	}
 
-	shfo.hwnd	= hOwner;
-	shfo.pFrom	= pszFullFilenames;
-	shfo.pTo	= strOutputFilename.c_str();
-	shfo.fFlags	= FOF_ALLOWUNDO;
-	bRes = (!SHFileOperation(&shfo) && !shfo.fAnyOperationsAborted);
+	if (flags != 0)
+	{
+		hr = fo->SetOperationFlags(flags);
 
-	free(pszFullFilenames);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+	}
 
-	return bRes;
+	IShellItemArray *shellItemArray;
+	hr = SHCreateShellItemArrayFromIDLists(static_cast<UINT>(pidls.size()), &pidls[0], &shellItemArray);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	BOOST_SCOPE_EXIT(shellItemArray) {
+		shellItemArray->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	IUnknown *unknown;
+	hr = shellItemArray->QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&unknown));
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	BOOST_SCOPE_EXIT(unknown) {
+		unknown->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	hr = fo->DeleteItems(unknown);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = fo->PerformOperations();
+
+	return hr;
+}
+
+HRESULT NFileOperations::CopyFilesToFolder(HWND hOwner, const std::wstring &strTitle,
+	std::vector<LPCITEMIDLIST> &pidls, bool move)
+{
+	LPITEMIDLIST pidl;
+	BOOL bRes = NFileOperations::CreateBrowseDialog(hOwner,strTitle.c_str(),&pidl);
+
+	if(!bRes)
+	{
+		return E_FAIL;
+	}
+
+	BOOST_SCOPE_EXIT(pidl) {
+		CoTaskMemFree(pidl);
+	} BOOST_SCOPE_EXIT_END
+
+	IShellItem *destinationFolder = nullptr;
+	HRESULT hr = SHCreateItemFromIDList(pidl, IID_PPV_ARGS(&destinationFolder));
+
+	if (FAILED(hr))
+	{
+		return E_FAIL;
+	}
+
+	BOOST_SCOPE_EXIT(destinationFolder) {
+		destinationFolder->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	hr = CopyFiles(hOwner, destinationFolder, pidls, move);
+
+	return hr;
+}
+
+HRESULT NFileOperations::CopyFiles(HWND hwnd, IShellItem *destinationFolder,
+	std::vector<LPCITEMIDLIST> &pidls, bool move)
+{
+	IFileOperation *fo;
+	HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&fo));
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	BOOST_SCOPE_EXIT(fo) {
+		fo->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	hr = fo->SetOwnerWindow(hwnd);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = fo->SetOperationFlags(FOF_ALLOWUNDO);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	IShellItemArray *shellItemArray;
+	hr = SHCreateShellItemArrayFromIDLists(static_cast<UINT>(pidls.size()), &pidls[0], &shellItemArray);
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	BOOST_SCOPE_EXIT(shellItemArray) {
+		shellItemArray->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	IUnknown *unknown;
+	hr = shellItemArray->QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&unknown));
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	BOOST_SCOPE_EXIT(unknown) {
+		unknown->Release();
+	} BOOST_SCOPE_EXIT_END
+
+	if (move)
+	{
+		hr = fo->MoveItems(unknown, destinationFolder);
+	}
+	else
+	{
+		hr = fo->CopyItems(unknown, destinationFolder);
+	}
+
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = fo->PerformOperations();
+
+	return hr;
 }
 
 TCHAR *NFileOperations::BuildFilenameList(const std::list<std::wstring> &FilenameList)
@@ -130,7 +251,7 @@ TCHAR *NFileOperations::BuildFilenameList(const std::list<std::wstring> &Filenam
 	TCHAR *pszFilenames = NULL;
 	int iTotalSize = 0;
 
-	for each(auto Filename in FilenameList)
+	for(const auto &Filename : FilenameList)
 	{
 		pszFilenames = reinterpret_cast<TCHAR *>(realloc(pszFilenames,
 			(iTotalSize + Filename.size() + 1) * sizeof(TCHAR)));
@@ -147,72 +268,41 @@ TCHAR *NFileOperations::BuildFilenameList(const std::list<std::wstring> &Filenam
 	return pszFilenames;
 }
 
-HRESULT CreateNewFolder(const TCHAR *Directory,TCHAR *szNewFolderName,int cchMax)
+
+// Creates a new folder. Note that IFileOperation will take care of
+// renaming the folder if one with that name already exists.
+HRESULT NFileOperations::CreateNewFolder(IShellItem *destinationFolder, const std::wstring &newFolderName,
+	IFileOperationProgressSink *progressSink)
 {
-	WIN32_FIND_DATA	wfd;
-	HANDLE			hFirstFile;
-	WCHAR			szLongPath[32768];
-	TCHAR			FolderName[32768];
-	BOOL			res;
-	int				i = 2;
+	IFileOperation *fo;
+	HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&fo));
 
-	if(Directory == NULL)
-		return E_INVALIDARG;
-
-	if(Directory[lstrlen(Directory) - 1] == '\\')
+	if (FAILED(hr))
 	{
-		/* DON'T add a backslash to a path that already has
-		one. Since it is assumed that ALL paths this function
-		handles may be longer than MAX_PATH, don't use any
-		of the Path* functions. */
-		StringCchPrintf(FolderName,SIZEOF_ARRAY(FolderName),
-			_T("%sNew Folder"),Directory);
-	}
-	else
-	{
-		StringCchPrintf(FolderName,SIZEOF_ARRAY(FolderName),
-			_T("%s\\New Folder"),Directory);
+		return hr;
 	}
 
-	StringCchPrintf(szLongPath,SIZEOF_ARRAY(szLongPath),
-		L"\\\\?\\%s",FolderName);
+	BOOST_SCOPE_EXIT(fo) {
+		fo->Release();
+	} BOOST_SCOPE_EXIT_END
 
-	while((hFirstFile = FindFirstFile(szLongPath,&wfd))
-	!= INVALID_HANDLE_VALUE)
+	hr = fo->SetOperationFlags(FOF_ALLOWUNDO | FOF_SILENT);
+
+	if (FAILED(hr))
 	{
-		FindClose(hFirstFile);
-
-		if(Directory[lstrlen(Directory) - 1] == '\\')
-		{
-			/* DON'T add a backslash to a path that already has
-			one. Since it is assumed that ALL paths this function
-			handles may be longer than MAX_PATH, don't use any
-			of the Path* functions. */
-			StringCchPrintf(FolderName,SIZEOF_ARRAY(FolderName),
-				_T("%sNew Folder (%d)"),Directory,i);
-		}
-		else
-		{
-			StringCchPrintf(FolderName,SIZEOF_ARRAY(FolderName),
-				_T("%s\\New Folder (%d)"),Directory,i);
-		}
-
-		StringCchPrintf(szLongPath,SIZEOF_ARRAY(szLongPath),
-			L"\\\\?\\%s",FolderName);
-
-		i++;
+		return hr;
 	}
 
-	res = CreateDirectory(szLongPath,NULL);
+	hr = fo->NewItem(destinationFolder, FILE_ATTRIBUTE_DIRECTORY, newFolderName.c_str(), nullptr, progressSink);
 
-	if(!res)
+	if (FAILED(hr))
 	{
-		return E_FAIL;
+		return hr;
 	}
 
-	StringCchCopy(szNewFolderName,cchMax,FolderName);
+	hr = fo->PerformOperations();
 
-	return S_OK;
+	return hr;
 }
 
 BOOL NFileOperations::SaveDirectoryListing(const std::wstring &strDirectory,const std::wstring &strFilename)
@@ -308,14 +398,14 @@ BOOL NFileOperations::SaveDirectoryListing(const std::wstring &strDirectory,cons
 
 	strContents += _T("\r\nFolders\r\n-------\r\n");
 
-	for each(auto Folder in FolderList)
+	for(const auto &Folder : FolderList)
 	{
 		strContents += Folder + _T("\r\n");
 	}
 
 	strContents += _T("\r\nFiles\r\n-----\r\n");
 
-	for each(auto File in FileList)
+	for(const auto &File : FileList)
 	{
 		strContents += File + _T("\r\n");
 	}
@@ -523,7 +613,7 @@ HRESULT NFileOperations::CreateLinkToFile(const std::wstring &strTargetFilename,
 	return hr;
 }
 
-HRESULT NFileOperations::ResolveLink(HWND hwnd,DWORD fFlags,TCHAR *szLinkFilename,TCHAR *szResolvedPath,int nBufferSize)
+HRESULT NFileOperations::ResolveLink(HWND hwnd, DWORD fFlags, const TCHAR *szLinkFilename, TCHAR *szResolvedPath, int nBufferSize)
 {
 	SHFILEINFO shfi;
 	DWORD_PTR dwRet = SHGetFileInfo(szLinkFilename,NULL,&shfi,sizeof(shfi),SHGFI_ATTRIBUTES);
@@ -564,22 +654,6 @@ HRESULT NFileOperations::ResolveLink(HWND hwnd,DWORD fFlags,TCHAR *szLinkFilenam
 	}
 
 	return hr;
-}
-
-BOOL NFileOperations::CreateBrowseDialog(HWND hOwner,const std::wstring &strTitle,std::wstring &strOutputFilename)
-{
-	LPITEMIDLIST pidl = NULL;
-	BOOL bRes = NFileOperations::CreateBrowseDialog(hOwner,strTitle,&pidl);
-
-	if(bRes)
-	{
-		TCHAR szOutputFilename[MAX_PATH];
-		SHGetPathFromIDList(pidl,szOutputFilename);
-		strOutputFilename = szOutputFilename;
-		CoTaskMemFree(pidl);
-	}
-
-	return bRes;
 }
 
 BOOL NFileOperations::CreateBrowseDialog(HWND hOwner,const std::wstring &strTitle,LPITEMIDLIST *ppidl)

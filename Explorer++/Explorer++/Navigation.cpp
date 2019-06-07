@@ -1,42 +1,31 @@
-/******************************************************************
-*
-* Project: Explorer++
-* File: Navigation.cpp
-* License: GPL - See LICENSE in the top level directory
-*
-* Navigation-related functionality.
-*
-* Written by David Erceg
-* www.explorerplusplus.com
-*
-*****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "Config.h"
 #include "MainResource.h"
 #include "../Helper/ProcessHelper.h"
 #include "../Helper/ShellHelper.h"
 
-
 void Explorerplusplus::OnBrowseBack()
 {
-	BrowseFolder(EMPTY_STRING,
-		SBSP_NAVIGATEBACK | SBSP_SAMEBROWSER);
+	BrowseFolderInCurrentTab(EMPTY_STRING, SBSP_NAVIGATEBACK);
 }
 
 void Explorerplusplus::OnBrowseForward()
 {
-	BrowseFolder(EMPTY_STRING,
-		SBSP_NAVIGATEFORWARD | SBSP_SAMEBROWSER);
+	BrowseFolderInCurrentTab(EMPTY_STRING, SBSP_NAVIGATEFORWARD);
 }
 
-void Explorerplusplus::OnHome()
+void Explorerplusplus::OnNavigateHome()
 {
-	HRESULT hr = BrowseFolder(m_DefaultTabDirectory, SBSP_ABSOLUTE);
+	HRESULT hr = BrowseFolderInCurrentTab(m_config->defaultTabDirectory.c_str(), SBSP_ABSOLUTE);
 
 	if(FAILED(hr))
 	{
-		BrowseFolder(m_DefaultTabDirectoryStatic, SBSP_ABSOLUTE);
+		BrowseFolderInCurrentTab(m_config->defaultTabDirectoryStatic.c_str(), SBSP_ABSOLUTE);
 	}
 }
 
@@ -48,7 +37,7 @@ void Explorerplusplus::OnNavigateUp()
 
 	PathStripPath(szDirectory);
 
-	HRESULT hr = BrowseFolder(EMPTY_STRING, SBSP_PARENT | SBSP_SAMEBROWSER);
+	HRESULT hr = BrowseFolderInCurrentTab(EMPTY_STRING, SBSP_PARENT);
 
 	if(SUCCEEDED(hr))
 	{
@@ -60,7 +49,7 @@ void Explorerplusplus::OnNavigateUp()
 * Navigates to the folder specified by the incoming
 * csidl.
 */
-void Explorerplusplus::GotoFolder(int FolderCSIDL)
+void Explorerplusplus::OnGotoFolder(int FolderCSIDL)
 {
 	LPITEMIDLIST pidl = NULL;
 	HRESULT hr = SHGetFolderLocation(NULL, FolderCSIDL, NULL, 0, &pidl);
@@ -68,10 +57,16 @@ void Explorerplusplus::GotoFolder(int FolderCSIDL)
 	/* Don't use SUCCEEDED(hr). */
 	if(hr == S_OK)
 	{
-		BrowseFolder(pidl, SBSP_SAMEBROWSER | SBSP_ABSOLUTE);
+		BrowseFolderInCurrentTab(pidl, SBSP_ABSOLUTE);
 
 		CoTaskMemFree(pidl);
 	}
+}
+
+HRESULT Explorerplusplus::BrowseFolderInCurrentTab(const TCHAR *szPath, UINT wFlags)
+{
+	Tab &tab = m_tabContainer->GetSelectedTab();
+	return BrowseFolder(tab, szPath, wFlags);
 }
 
 /*
@@ -88,13 +83,7 @@ The ONLY times an idl should be sent are:
 - When loading directories on startup
 - When navigating to a folder on the 'Go' menu
 */
-HRESULT Explorerplusplus::BrowseFolder(const TCHAR *szPath, UINT wFlags)
-{
-	return BrowseFolder(szPath, wFlags, FALSE, FALSE, FALSE);
-}
-
-HRESULT Explorerplusplus::BrowseFolder(const TCHAR *szPath, UINT wFlags,
-	BOOL bOpenInNewTab, BOOL bSwitchToNewTab, BOOL bOpenInNewWindow)
+HRESULT Explorerplusplus::BrowseFolder(Tab &tab, const TCHAR *szPath, UINT wFlags)
 {
 	/* Doesn't matter if we can't get the pidl here,
 	as some paths will be relative, or will be filled
@@ -102,9 +91,9 @@ HRESULT Explorerplusplus::BrowseFolder(const TCHAR *szPath, UINT wFlags,
 	LPITEMIDLIST pidl = NULL;
 	HRESULT hr = GetIdlFromParsingName(szPath, &pidl);
 
-	BrowseFolder(pidl, wFlags, bOpenInNewTab, bSwitchToNewTab, bOpenInNewWindow);
+	BrowseFolder(tab, pidl, wFlags);
 
-	if(SUCCEEDED(hr))
+	if (SUCCEEDED(hr))
 	{
 		CoTaskMemFree(pidl);
 	}
@@ -112,119 +101,91 @@ HRESULT Explorerplusplus::BrowseFolder(const TCHAR *szPath, UINT wFlags,
 	return hr;
 }
 
-/* ALL calls to browse a folder in the current tab MUST
-pass through this function. This ensures that tabs that
-have their addresses locked will not change directory. */
-HRESULT Explorerplusplus::BrowseFolder(LPCITEMIDLIST pidlDirectory, UINT wFlags)
+HRESULT Explorerplusplus::BrowseFolderInCurrentTab(LPCITEMIDLIST pidlDirectory, UINT wFlags)
 {
-	HRESULT hr;
-	int iTabObjectIndex = -1;
+	Tab &tab = m_tabContainer->GetSelectedTab();
+	return BrowseFolder(tab, pidlDirectory, wFlags);
+}
 
-	if(!m_TabInfo.at(m_selectedTabId).bAddressLocked)
+/* ALL calls to browse a folder in a particular tab MUST
+pass through this function. This ensures that tabs that
+have their addresses locked will not change directory (a
+new tab will be created instead). */
+HRESULT Explorerplusplus::BrowseFolder(Tab &tab, LPCITEMIDLIST pidlDirectory, UINT wFlags)
+{
+	HRESULT hr = E_FAIL;
+	int resultingTabId = -1;
+
+	if(!tab.GetAddressLocked())
 	{
-		hr = m_pActiveShellBrowser->BrowseFolder(pidlDirectory, wFlags);
+		hr = tab.GetShellBrowser()->BrowseFolder(pidlDirectory, wFlags);
 
 		if(SUCCEEDED(hr))
 		{
 			PlayNavigationSound();
 		}
 
-		iTabObjectIndex = m_selectedTabId;
+		resultingTabId = tab.GetId();
 	}
 	else
 	{
-		hr = CreateNewTab(pidlDirectory, NULL, NULL, TRUE, &iTabObjectIndex);
+		hr = CreateNewTab(pidlDirectory, TabSettings(_selected = true), nullptr, nullptr, &resultingTabId);
 	}
 
 	if(SUCCEEDED(hr))
 	{
-		OnDirChanged(iTabObjectIndex);
+		const Tab &resultingTab = m_tabContainer->GetTab(resultingTabId);
+		OnNavigationCompleted(resultingTab);
 	}
 
 	return hr;
 }
 
-HRESULT Explorerplusplus::BrowseFolder(LPCITEMIDLIST pidlDirectory, UINT wFlags,
-	BOOL bOpenInNewTab, BOOL bSwitchToNewTab, BOOL bOpenInNewWindow)
+void Explorerplusplus::OpenDirectoryInNewWindow(LPCITEMIDLIST pidlDirectory)
 {
-	HRESULT hr = E_FAIL;
-	int iTabObjectIndex = -1;
+	TCHAR szPath[MAX_PATH];
+	TCHAR szParameters[512];
 
-	if(bOpenInNewWindow)
-	{
-		TCHAR szPath[MAX_PATH];
-		TCHAR szParameters[512];
+	/* Create a new instance of this program, with the
+	specified path as an argument. */
+	GetDisplayName(pidlDirectory, szPath, SIZEOF_ARRAY(szPath), SHGDN_FORPARSING);
+	StringCchPrintf(szParameters, SIZEOF_ARRAY(szParameters), _T("\"%s\""), szPath);
 
-		/* Create a new instance of this program, with the
-		specified path as an argument. */
-		GetDisplayName(pidlDirectory, szPath, SIZEOF_ARRAY(szPath), SHGDN_FORPARSING);
-		StringCchPrintf(szParameters, SIZEOF_ARRAY(szParameters), _T("\"%s\""), szPath);
-
-		ExecuteAndShowCurrentProcess(m_hContainer, szParameters);
-	}
-	else
-	{
-		if(!bOpenInNewTab && !m_TabInfo.at(m_selectedTabId).bAddressLocked)
-		{
-			hr = m_pActiveShellBrowser->BrowseFolder(pidlDirectory, wFlags);
-
-			if(SUCCEEDED(hr))
-			{
-				PlayNavigationSound();
-			}
-
-			iTabObjectIndex = m_selectedTabId;
-		}
-		else
-		{
-			if(m_TabInfo.at(m_selectedTabId).bAddressLocked)
-			{
-				hr = CreateNewTab(pidlDirectory, NULL, NULL, TRUE, &iTabObjectIndex);
-			}
-			else
-			{
-				hr = CreateNewTab(pidlDirectory, NULL, NULL, bSwitchToNewTab, &iTabObjectIndex);
-			}
-		}
-
-		if(SUCCEEDED(hr))
-		{
-			OnDirChanged(iTabObjectIndex);
-		}
-	}
-
-	return hr;
+	ExecuteAndShowCurrentProcess(m_hContainer, szParameters);
 }
 
 void Explorerplusplus::PlayNavigationSound() const
 {
-	if(m_bPlayNavigationSound)
+	if(m_config->playNavigationSound)
 	{
 		PlaySound(MAKEINTRESOURCE(IDR_WAVE_NAVIGATIONSTART), NULL,
 			SND_RESOURCE | SND_ASYNC);
 	}
 }
 
-void Explorerplusplus::OnDirChanged(int iTabId)
+void Explorerplusplus::OnNavigationCompleted(const Tab &tab)
 {
-	m_pActiveShellBrowser->QueryCurrentDirectory(SIZEOF_ARRAY(m_CurrentDirectory),
-		m_CurrentDirectory);
-	SetCurrentDirectory(m_CurrentDirectory);
+	if (m_tabContainer->IsTabSelected(tab))
+	{
+		tab.GetShellBrowser()->QueryCurrentDirectory(SIZEOF_ARRAY(m_CurrentDirectory),
+			m_CurrentDirectory);
+		SetCurrentDirectory(m_CurrentDirectory);
 
-	HandleDirectoryMonitoring(iTabId);
+		UpdateArrangeMenuItems();
 
-	UpdateArrangeMenuItems();
+		m_nSelected = 0;
 
-	m_nSelected = 0;
+		UpdateWindowStates();
+	}
 
-	/* Set the focus back to the first item. */
-	ListView_SetItemState(m_hActiveListView, 0, LVIS_FOCUSED, LVIS_FOCUSED);
+	HandleDirectoryMonitoring(tab.GetId());
 
-	UpdateWindowStates();
+	m_navigationCompletedSignal(tab);
+}
 
-	InvalidateTaskbarThumbnailBitmap(iTabId);
-
-	SetTabIcon();
+boost::signals2::connection Explorerplusplus::AddNavigationCompletedObserver(const NavigationCompletedSignal::slot_type &observer)
+{
+	return m_navigationCompletedSignal.connect(observer);
 }
 
 void Explorerplusplus::OnStartedBrowsing(int iTabId, const TCHAR *szFolderPath)

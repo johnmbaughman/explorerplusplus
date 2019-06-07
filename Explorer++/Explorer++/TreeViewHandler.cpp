@@ -1,28 +1,20 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: TreeViewHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles messages associated with the main
- * treeview control.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "Config.h"
 #include "HolderWindow.h"
-#include "SetFileAttributesDialog.h"
 #include "MainResource.h"
-#include "../Helper/ShellHelper.h"
+#include "MainToolbar.h"
+#include "SetFileAttributesDialog.h"
+#include "../Helper/Controls.h"
 #include "../Helper/FileContextMenuManager.h"
 #include "../Helper/Helper.h"
-#include "../Helper/Controls.h"
 #include "../Helper/Macros.h"
-
+#include "../Helper/ShellHelper.h"
+#include "../MyTreeView/MyTreeView.h"
 
 #define TREEVIEW_FOLDER_OPEN_DELAY	500
 #define FOLDERS_TOOLBAR_CLOSE		6000
@@ -39,7 +31,7 @@ void Explorerplusplus::CreateFolderControls(void)
 	TCHAR szTemp[32];
 	UINT uStyle = WS_CHILD|WS_CLIPSIBLINGS|WS_CLIPCHILDREN;
 
-	if(m_bShowFolders)
+	if(m_config->showFolders)
 		uStyle |= WS_VISIBLE;
 
 	LoadString(m_hLanguageModule,IDS_FOLDERS_WINDOW_TEXT,szTemp,SIZEOF_ARRAY(szTemp));
@@ -79,7 +71,7 @@ WPARAM wParam,LPARAM lParam)
 	switch(uMsg)
 	{
 	case WM_SETFOCUS:
-		UpdateMainToolbar();
+		m_mainToolbar->UpdateToolbarButtonStates();
 		break;
 
 	case WM_MBUTTONDOWN:
@@ -120,7 +112,7 @@ WPARAM wParam,LPARAM lParam)
 				if(tvhi.hItem == m_hTVMButtonItem)
 				{
 					pidl = m_pMyTreeView->BuildPath(tvhi.hItem);
-					BrowseFolder(pidl,SBSP_ABSOLUTE,TRUE,FALSE,FALSE);
+					CreateNewTab(pidl);
 
 					CoTaskMemFree(pidl);
 				}
@@ -269,7 +261,7 @@ void Explorerplusplus::OnTreeViewShowFileProperties(void) const
 	/* Get the path of the currently selected item. */
 	pidlDirectory = m_pMyTreeView->BuildPath(hItem);
 
-	ShowMultipleFileProperties(pidlDirectory,NULL,0);
+	ShowMultipleFileProperties(pidlDirectory,NULL, m_hContainer,0);
 
 	CoTaskMemFree(pidlDirectory);
 }
@@ -323,7 +315,7 @@ BOOL Explorerplusplus::OnTreeViewItemExpanding(LPARAM lParam)
 				LPITEMIDLIST pidl	= NULL;
 
 				pidl = m_pMyTreeView->BuildPath(tvItem->hItem);
-				BrowseFolder(pidl,SBSP_SAMEBROWSER);
+				BrowseFolderInCurrentTab(pidl,0);
 
 				CoTaskMemFree(pidl);
 			}
@@ -451,9 +443,9 @@ void Explorerplusplus::OnTreeViewHolderWindowTimer(void)
 	if(!m_bSelectingTreeViewDirectory && !m_bTreeViewRightClick &&
 		!CompareIdls(pidlDirectory,pidlCurrentDirectory))
 	{
-		BrowseFolder(pidlDirectory,SBSP_SAMEBROWSER);
+		BrowseFolderInCurrentTab(pidlDirectory,0);
 
-		if(m_bTVAutoExpandSelected)
+		if(m_config->treeViewAutoExpandSelected)
 		{
 			TreeView_Expand(m_hTreeView,g_NewSelectionItem,TVE_EXPAND);
 		}
@@ -482,7 +474,7 @@ void Explorerplusplus::OnTreeViewSelChanged(LPARAM lParam)
 
 			g_NewSelectionItem = tvItem->hItem;
 
-			if(m_bTreeViewDelayEnabled)
+			if(m_config->treeViewDelayEnabled)
 			{
 				/* Schedule a folder change. This adds enough
 				of a delay for the treeview selection to be changed
@@ -792,7 +784,7 @@ void Explorerplusplus::OnTreeViewPaste(void)
 
 			pDropHandler->CopyClipboardData(pClipboardObject,
 				m_hTreeView,szFullFileName,NULL,
-				!m_bOverwriteExistingFilesConfirmation);
+				!m_config->overwriteExistingFilesConfirmation);
 
 			CoTaskMemFree(pidl);
 
@@ -811,7 +803,7 @@ void Explorerplusplus::UpdateTreeViewSelection(void)
 	UINT			uDriveType;
 	BOOL			bNetworkPath = FALSE;
 
-	if(!m_bSynchronizeTreeview)
+	if(!m_config->synchronizeTreeview)
 	{
 		return;
 	}

@@ -1,11 +1,17 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include "CoreInterface.h"
+#include "HardwareChangeNotifier.h"
+#include "TabContainerInterface.h"
+#include "../Helper/BaseWindow.h"
+#include "../Helper/FileContextMenuManager.h"
+#include <boost\serialization\strong_typedef.hpp>
 #include <list>
 #include <unordered_map>
-#include <boost\serialization\strong_typedef.hpp>
-#include "HardwareChangeNotifier.h"
-#include "../Helper/FileContextMenuManager.h"
-#include "../Helper/BaseWindow.h"
 
 class CDrivesToolbar : public CBaseWindow, public IFileContextMenuExternal, public NHardwareChangeNotifier::INotification
 {
@@ -13,7 +19,7 @@ class CDrivesToolbar : public CBaseWindow, public IFileContextMenuExternal, publ
 
 public:
 
-	static CDrivesToolbar *Create(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp);
+	static CDrivesToolbar	*Create(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp, TabContainerInterface *tabContainer);
 
 	/* IFileContextMenuExternal methods. */
 	void	AddMenuEntries(LPCITEMIDLIST pidlParent,const std::list<LPITEMIDLIST> &pidlItemList,DWORD_PTR dwData,HMENU hMenu);
@@ -43,7 +49,7 @@ private:
 
 	LRESULT CALLBACK DrivesToolbarParentProc(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lParam);
 
-	CDrivesToolbar(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp);
+	CDrivesToolbar(HWND hParent, UINT uIDStart, UINT uIDEnd, HINSTANCE hInstance, IExplorerplusplus *pexpp, TabContainerInterface *tabContainer);
 	~CDrivesToolbar();
 
 	static HWND	CreateDrivesToolbar(HWND hParent);
@@ -69,6 +75,7 @@ private:
 	UINT		m_uIDEnd;
 
 	IExplorerplusplus *m_pexpp;
+	TabContainerInterface	*m_tabContainer;
 
 	struct IDCounterHasher
 	{

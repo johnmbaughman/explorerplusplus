@@ -1,37 +1,30 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: SelectColumnsDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Select Columns' dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <algorithm>
-#include <functional>
-#include "Explorer++_internal.h"
 #include "SelectColumnsDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
 #include "ShellBrowser/iShellView.h"
 #include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
+#include <algorithm>
+#include <functional>
 
 
 const TCHAR CSelectColumnsDialogPersistentSettings::SETTINGS_KEY[] = _T("SelectColumns");
 
 CSelectColumnsDialog::CSelectColumnsDialog(HINSTANCE hInstance,
-	int iResource,HWND hParent,IExplorerplusplus *pexpp) :
-CBaseDialog(hInstance,iResource,hParent,true)
+	int iResource,HWND hParent,IExplorerplusplus *pexpp,
+	CTabContainer *tabContainer, TabInterface *ti) :
+	CBaseDialog(hInstance,iResource,hParent,true),
+	m_pexpp(pexpp),
+	m_tabContainer(tabContainer),
+	m_ti(ti),
+	m_bColumnsSwapped(FALSE)
 {
-	m_pexpp = pexpp;
-	m_bColumnsSwapped = FALSE;
-
 	m_pscdps = &CSelectColumnsDialogPersistentSettings::GetInstance();
 }
 
@@ -62,7 +55,7 @@ INT_PTR CSelectColumnsDialog::OnInitDialog()
 
 	int iItem = 0;
 
-	for each(auto Column in ActiveColumnList)
+	for(const auto &Column : ActiveColumnList)
 	{
 		TCHAR szText[64];
 		LoadString(GetInstance(),CShellBrowser::LookupColumnNameStringIndex(Column.id),
@@ -280,7 +273,7 @@ void CSelectColumnsDialog::OnOk()
 
 	if(m_bColumnsSwapped)
 	{
-		m_pexpp->RefreshTab(m_pexpp->GetCurrentTabId());
+		m_ti->RefreshTab(m_tabContainer->GetSelectedTab());
 	}
 
 	EndDialog(m_hDlg,1);

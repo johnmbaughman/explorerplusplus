@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ManageBookmarksDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Manage Bookmarks' dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <stack>
@@ -32,8 +23,9 @@ namespace NManageBookmarksDialog
 const TCHAR CManageBookmarksDialogPersistentSettings::SETTINGS_KEY[] = _T("ManageBookmarks");
 
 CManageBookmarksDialog::CManageBookmarksDialog(HINSTANCE hInstance, int iResource, HWND hParent,
-	IExplorerplusplus *pexpp, CBookmarkFolder &AllBookmarks) :
+	IExplorerplusplus *pexpp, TabContainerInterface *tabContainer, CBookmarkFolder &AllBookmarks) :
 m_pexpp(pexpp),
+m_tabContainer(tabContainer),
 m_AllBookmarks(AllBookmarks),
 m_guidCurrentFolder(AllBookmarks.GetGUID()),
 m_bNewFolderAdded(false),
@@ -166,7 +158,7 @@ void CManageBookmarksDialog::SetupTreeView()
 {
 	HWND hTreeView = GetDlgItem(m_hDlg,IDC_MANAGEBOOKMARKS_TREEVIEW);
 
-	m_pBookmarkTreeView = new CBookmarkTreeView(hTreeView,&m_AllBookmarks,
+	m_pBookmarkTreeView = new CBookmarkTreeView(hTreeView,GetInstance(),&m_AllBookmarks,
 		m_pmbdps->m_guidSelected,m_pmbdps->m_setExpansion);
 }
 
@@ -178,7 +170,7 @@ void CManageBookmarksDialog::SetupListView()
 
 	int iColumn = 0;
 
-	for each(auto ci in m_pmbdps->m_vectorColumnInfo)
+	for(const auto &ci : m_pmbdps->m_vectorColumnInfo)
 	{
 		if(ci.bActive)
 		{
@@ -205,7 +197,7 @@ void CManageBookmarksDialog::SetupListView()
 	{
 		int iSubItem = 1;
 
-		for each(auto ci in m_pmbdps->m_vectorColumnInfo)
+		for(const auto &ci : m_pmbdps->m_vectorColumnInfo)
 		{
 			/* The name column will always appear first in
 			the set of columns and can be skipped here. */
@@ -252,8 +244,8 @@ int CALLBACK CManageBookmarksDialog::SortBookmarks(LPARAM lParam1,LPARAM lParam2
 	HTREEITEM hSelected = TreeView_GetSelection(hTreeView);
 	CBookmarkFolder &BookmarkFolder = m_pBookmarkTreeView->GetBookmarkFolderFromTreeView(hSelected);
 
-	NBookmarkHelper::variantBookmark_t variantBookmark1 = m_pBookmarkListView->GetBookmarkItemFromListViewlParam(BookmarkFolder,lParam1);
-	NBookmarkHelper::variantBookmark_t variantBookmark2 = m_pBookmarkListView->GetBookmarkItemFromListViewlParam(BookmarkFolder,lParam2);
+	const VariantBookmark &variantBookmark1 = m_pBookmarkListView->GetBookmarkItemFromListViewlParam(BookmarkFolder,lParam1);
+	const VariantBookmark &variantBookmark2 = m_pBookmarkListView->GetBookmarkItemFromListViewlParam(BookmarkFolder,lParam2);
 
 	int iRes = NBookmarkHelper::Sort(m_pmbdps->m_SortMode,variantBookmark1,variantBookmark2);
 
@@ -350,9 +342,6 @@ INT_PTR CManageBookmarksDialog::OnCommand(WPARAM wParam,LPARAM lParam)
 		break;
 
 	case IDM_MB_BOOKMARK_OPENINNEWTAB:
-		break;
-
-	case IDM_MB_BOOKMARK_OPENINNEWWINDOW:
 		break;
 
 	case IDM_MB_BOOKMARK_DELETE:
@@ -470,7 +459,7 @@ void CManageBookmarksDialog::OnListViewHeaderRClick()
 	HMENU hMenu = CreatePopupMenu();
 	int iMenuItem = 0;
 
-	for each(auto ci in m_pmbdps->m_vectorColumnInfo)
+	for(const auto &ci : m_pmbdps->m_vectorColumnInfo)
 	{
 		TCHAR szColumn[128];
 		GetColumnString(ci.ColumnType,szColumn,SIZEOF_ARRAY(szColumn));
@@ -566,7 +555,7 @@ BOOL CManageBookmarksDialog::OnLvnEndLabelEdit(NMLVDISPINFO *pnmlvdi)
 		assert(hSelectedItem != NULL);
 
 		CBookmarkFolder &ParentBookmarkFolder = m_pBookmarkTreeView->GetBookmarkFolderFromTreeView(hSelectedItem);
-		NBookmarkHelper::variantBookmark_t variantBookmark = m_pBookmarkListView->GetBookmarkItemFromListView(
+		VariantBookmark &variantBookmark = m_pBookmarkListView->GetBookmarkItemFromListView(
 			ParentBookmarkFolder,pnmlvdi->item.iItem);
 
 		if(variantBookmark.type() == typeid(CBookmarkFolder))
@@ -666,7 +655,7 @@ void CManageBookmarksDialog::GetColumnString(CManageBookmarksDialogPersistentSet
 	LoadString(GetInstance(),uResourceID,szColumn,cchBuf);
 }
 
-void CManageBookmarksDialog::GetBookmarkItemColumnInfo(const NBookmarkHelper::variantBookmark_t variantBookmark,
+void CManageBookmarksDialog::GetBookmarkItemColumnInfo(const VariantBookmark &variantBookmark,
 	CManageBookmarksDialogPersistentSettings::ColumnType_t ColumnType,TCHAR *szColumn,size_t cchBuf)
 {
 	if(variantBookmark.type() == typeid(CBookmarkFolder))
@@ -906,18 +895,18 @@ void CManageBookmarksDialog::OnDblClk(NMHDR *pnmhdr)
 		HWND hTreeView = GetDlgItem(m_hDlg,IDC_MANAGEBOOKMARKS_TREEVIEW);
 		HTREEITEM hSelected = TreeView_GetSelection(hTreeView);
 		CBookmarkFolder &ParentBookmarkFolder = m_pBookmarkTreeView->GetBookmarkFolderFromTreeView(hSelected);
-		NBookmarkHelper::variantBookmark_t variantBookmark = m_pBookmarkListView->GetBookmarkItemFromListView(
+		const VariantBookmark &variantBookmark = m_pBookmarkListView->GetBookmarkItemFromListView(
 			ParentBookmarkFolder,pnmia->iItem);
 
 		if(variantBookmark.type() == typeid(CBookmarkFolder))
 		{
-			CBookmarkFolder &BookmarkFolder = boost::get<CBookmarkFolder>(variantBookmark);
+			const CBookmarkFolder &BookmarkFolder = boost::get<CBookmarkFolder>(variantBookmark);
 			BrowseBookmarkFolder(BookmarkFolder);
 		}
 		else if(variantBookmark.type() == typeid(CBookmark))
 		{
-			CBookmark &Bookmark = boost::get<CBookmark>(variantBookmark);
-			m_pexpp->BrowseFolder(Bookmark.GetLocation().c_str(), SBSP_ABSOLUTE, FALSE, FALSE, FALSE);
+			const CBookmark &Bookmark = boost::get<CBookmark>(variantBookmark);
+			m_tabContainer->BrowseFolderInCurrentTab(Bookmark.GetLocation().c_str(), SBSP_ABSOLUTE);
 		}
 	}
 }

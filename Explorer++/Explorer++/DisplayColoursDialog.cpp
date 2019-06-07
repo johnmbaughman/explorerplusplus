@@ -1,32 +1,23 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: DisplayColoursDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Change Display Colours' dialog and associated messages.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
 #include "DisplayColoursDialog.h"
 #include "MainResource.h"
 #include "../DisplayWindow/DisplayWindow.h"
 #include "../Helper/Macros.h"
+#include <list>
 
 
 const TCHAR CDisplayColoursDialogPersistentSettings::SETTINGS_KEY[] = _T("DisplayColors");
 
 CDisplayColoursDialog::CDisplayColoursDialog(HINSTANCE hInstance,int iResource,
 	HWND hParent,HWND hDisplayWindow,COLORREF DefaultCenterColor,COLORREF DefaultSurroundingColor) :
-m_hDisplayWindow(hDisplayWindow),
-m_DefaultCenterColor(DefaultCenterColor),
-m_DefaultSurroundingColor(DefaultSurroundingColor),
-CBaseDialog(hInstance,iResource,hParent,false)
+	CBaseDialog(hInstance, iResource, hParent, false),
+	m_hDisplayWindow(hDisplayWindow),
+	m_DefaultCenterColor(DefaultCenterColor),
+	m_DefaultSurroundingColor(DefaultSurroundingColor)
 {
 	m_pdcdps = &CDisplayColoursDialogPersistentSettings::GetInstance();
 }

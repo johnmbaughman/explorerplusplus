@@ -1,17 +1,12 @@
-/******************************************************************
- *
- * Project: Helper
- * File: DialogSettings.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Saves/loads settings for a dialog. Window position
  * is saved automatically (if required); all other
  * settings must be explicitly specified.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "DialogSettings.h"
@@ -102,8 +97,8 @@ void CDialogSettings::LoadRegistrySettings(HKEY hParentKey)
 	}
 }
 
-void CDialogSettings::SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
-	MSXML2::IXMLDOMElement *pe)
+void CDialogSettings::SaveXMLSettings(IXMLDOMDocument *pXMLDom,
+	IXMLDOMElement *pe)
 {
 	if(!m_bStateSaved)
 	{
@@ -114,7 +109,7 @@ void CDialogSettings::SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
 	NXMLSettings::AddWhiteSpaceToNode(pXMLDom,bstr_wsntt,pe);
 	SysFreeString(bstr_wsntt);
 
-	MSXML2::IXMLDOMElement *pParentNode = NULL;
+	IXMLDOMElement *pParentNode = NULL;
 	NXMLSettings::CreateElementNode(pXMLDom,&pParentNode,pe,_T("DialogState"),m_szSettingsKey.c_str());
 
 	if(m_bSavePosition)
@@ -132,9 +127,9 @@ void CDialogSettings::SaveXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
 	SaveExtraXMLSettings(pXMLDom,pParentNode);
 }
 
-void CDialogSettings::LoadXMLSettings(MSXML2::IXMLDOMNamedNodeMap *pam,long lChildNodes)
+void CDialogSettings::LoadXMLSettings(IXMLDOMNamedNodeMap *pam,long lChildNodes)
 {
-	MSXML2::IXMLDOMNode *pNode = NULL;
+	IXMLDOMNode *pNode = NULL;
 	BSTR bstrName;
 	BSTR bstrValue;
 
@@ -206,7 +201,7 @@ void CDialogSettings::LoadExtraRegistrySettings(HKEY hKey)
 	UNREFERENCED_PARAMETER(hKey);
 }
 
-void CDialogSettings::SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pParentNode)
+void CDialogSettings::SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom,IXMLDOMElement *pParentNode)
 {
 	UNREFERENCED_PARAMETER(pXMLDom);
 	UNREFERENCED_PARAMETER(pParentNode);

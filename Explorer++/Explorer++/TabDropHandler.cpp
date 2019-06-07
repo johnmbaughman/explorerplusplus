@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: TabDropHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Manages drag and drop for the main tab control.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include <list>
@@ -17,11 +8,12 @@
 #include "../Helper/ShellHelper.h"
 #include "../Helper/Macros.h"
 
-
-CTabDropHandler::CTabDropHandler(HWND hTabCtrl,CTabContainer *pTabContainer) :
-m_hTabCtrl(hTabCtrl),
-m_pTabContainer(pTabContainer),
-m_RefCount(1)
+CTabDropHandler::CTabDropHandler(HWND hTabCtrl, CTabContainer *tabContainer,
+	TabContainerInterface *tabContainerInterface) :
+	m_hTabCtrl(hTabCtrl),
+	m_RefCount(1),
+	m_tabContainer(tabContainer),
+	m_tabContainerInterface(tabContainerInterface)
 {
 	SetWindowSubclass(m_hTabCtrl,TabCtrlProcStub,SUBCLASS_ID,reinterpret_cast<DWORD_PTR>(this));
 
@@ -94,7 +86,8 @@ LRESULT CALLBACK CTabDropHandler::TabCtrlProc(HWND hwnd,UINT uMsg,WPARAM wParam,
 	case WM_TIMER:
 		if(wParam == TIMER_ID)
 		{
-			m_pTabContainer->SetSelection(m_TabHoverIndex);
+			const Tab &tab = m_tabContainer->GetTabByIndex(m_TabHoverIndex);
+			m_tabContainerInterface->SelectTab(tab);
 
 			return 0;
 		}
@@ -111,12 +104,12 @@ LRESULT CALLBACK CTabDropHandler::TabCtrlProc(HWND hwnd,UINT uMsg,WPARAM wParam,
 HRESULT __stdcall CTabDropHandler::DragEnter(IDataObject *pDataObject,DWORD grfKeyState,POINTL pt,DWORD *pdwEffect)
 {
 	m_AcceptData = false;
-	m_TabHoverIndex = m_pTabContainer->GetSelection();
+	m_TabHoverIndex = m_tabContainerInterface->GetSelectedTabIndex();
 
 	std::list<FORMATETC> ftcList;
 	CDropHandler::GetDropFormats(ftcList);
 
-	for each(auto ftc in ftcList)
+	for(auto ftc : ftcList)
 	{
 		if(pDataObject->QueryGetData(&ftc) == S_OK)
 		{
@@ -200,10 +193,12 @@ DWORD CTabDropHandler::DetermineCurrentDragEffect(int iTab,DWORD grfKeyState,DWO
 
 	if(iTab != -1)
 	{
-		if(m_pTabContainer->GetBrowserForTab(iTab)->CanCreate())
+		const Tab &tab = m_tabContainer->GetTabByIndex(iTab);
+
+		if(tab.GetShellBrowser()->CanCreate())
 		{
 			TCHAR szDestDirectory[MAX_PATH];
-			m_pTabContainer->GetBrowserForTab(iTab)->QueryCurrentDirectory(SIZEOF_ARRAY(szDestDirectory),szDestDirectory);
+			tab.GetShellBrowser()->QueryCurrentDirectory(SIZEOF_ARRAY(szDestDirectory),szDestDirectory);
 
 			BOOL bOnSameDrive = PathIsSameRoot(szDestDirectory,m_RepresentativeDrive.c_str());
 			DropEffect = ::DetermineDragEffect(grfKeyState,CurrentDropEffect,m_AcceptData,bOnSameDrive);
@@ -226,7 +221,7 @@ HRESULT __stdcall CTabDropHandler::DragOver(DWORD grfKeyState,POINTL pt,DWORD *p
 	and the item is still been dragged, switch
 	focus to this tab. */
 	if(iTab != -1 &&
-		iTab != m_pTabContainer->GetSelection() &&
+		iTab != m_tabContainerInterface->GetSelectedTabIndex() &&
 		iTab != m_TabHoverIndex)
 	{
 		SetTimer(m_hTabCtrl,TIMER_ID,TIMEOUT_VALUE,NULL);
@@ -267,8 +262,10 @@ HRESULT __stdcall CTabDropHandler::Drop(IDataObject *pDataObject,DWORD grfKeySta
 	if(iTab != -1 &&
 		m_AcceptData)
 	{
+		const Tab &tab = m_tabContainer->GetTabByIndex(iTab);
+
 		TCHAR szDestDirectory[MAX_PATH];
-		m_pTabContainer->GetBrowserForTab(iTab)->QueryCurrentDirectory(
+		tab.GetShellBrowser()->QueryCurrentDirectory(
 			SIZEOF_ARRAY(szDestDirectory),szDestDirectory);
 
 		CDropHandler *pDropHandler = CDropHandler::CreateNew();

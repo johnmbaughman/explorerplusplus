@@ -1,20 +1,16 @@
-/******************************************************************
- *
- * Project: ShellBrowser
- * File: iDropTarget.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Handles the dropping of items onto
  * the main listview.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "IShellView.h"
 #include "iShellBrowser_internal.h"
+#include "ViewModes.h"
 #include "../Helper/Helper.h"
 #include "../Helper/ShellHelper.h"
 #include "../Helper/FileOperations.h"
@@ -55,7 +51,7 @@ DWORD grfKeyState,POINTL ptl,DWORD *pdwEffect)
 
 		/* Check whether the drop source has the type of data
 		that is needed for this drag operation. */
-		for each(auto ftc in ftcList)
+		for(auto ftc : ftcList)
 		{
 			if(pDataObject->QueryGetData(&ftc) == S_OK)
 			{
@@ -285,7 +281,7 @@ void CShellBrowser::HandleDragSelection(const POINT *ppt)
 		if(bOverItem)
 		{
 			/* Check for a clash (only if over a folder). */
-			if((m_pwfdFiles[iInternalIndex].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			if((m_itemInfoMap.at(iInternalIndex).wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 				== FILE_ATTRIBUTE_DIRECTORY)
 			{
 				if(m_bDragging)
@@ -364,7 +360,7 @@ void CShellBrowser::OnDropFile(const std::list<std::wstring> &PastedFileList, co
 		DroppedFile.DropPoint.x = ptOrigin.x + LocalDropPoint.x;
 		DroppedFile.DropPoint.y = ptOrigin.y + LocalDropPoint.y;
 
-		for each(auto strFilename in PastedFileList)
+		for(const auto &strFilename : PastedFileList)
 		{
 			StringCchCopy(DroppedFile.szFileName,
 				SIZEOF_ARRAY(DroppedFile.szFileName),strFilename.c_str());
@@ -434,7 +430,7 @@ DWORD grfKeyState,POINTL ptl,DWORD *pdwEffect)
 		lvItem.iSubItem	= 0;
 		ListView_GetItem(m_hListView,&lvItem);
 
-		PathAppend(szDestDirectory,m_pwfdFiles[(int)lvItem.lParam].cFileName);
+		PathAppend(szDestDirectory,m_itemInfoMap.at((int)lvItem.lParam).wfd.cFileName);
 	}
 
 	szDestDirectory[lstrlen(szDestDirectory) + 1] = '\0';
@@ -525,8 +521,8 @@ int CALLBACK SortTemporaryStub(LPARAM lParam1,LPARAM lParam2,LPARAM lParamSort)
 
 int CALLBACK CShellBrowser::SortTemporary(LPARAM lParam1,LPARAM lParam2)
 {
-	return m_pExtraItemInfo[lParam1].iRelativeSort -
-		m_pExtraItemInfo[lParam2].iRelativeSort;
+	return m_itemInfoMap.at(static_cast<int>(lParam1)).iRelativeSort -
+		m_itemInfoMap.at(static_cast<int>(lParam2)).iRelativeSort;
 }
 
 void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
@@ -542,7 +538,7 @@ void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
 	/* The auto arrange style must be off for the items
 	to be moved. Therefore, if the style is on, turn it
 	off, move the items, and the turn it back on. */
-	if(m_bAutoArrange)
+	if(m_folderSettings.autoArrange)
 		NListView::ListView_SetAutoArrange(m_hListView,FALSE);
 
 	for(itr = m_DraggedFilesList.begin();
@@ -552,7 +548,7 @@ void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
 
 		if(iItem != -1)
 		{
-			if(m_ViewMode == VM_DETAILS)
+			if(m_folderSettings.viewMode == +ViewMode::Details)
 			{
 				LVITEM lvItem;
 				POINT ptItem;
@@ -597,14 +593,14 @@ void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
 					{
 						if(i == iItem)
 						{
-							m_pExtraItemInfo[(int)lvItem.lParam].iRelativeSort = iInsert;
+							m_itemInfoMap.at((int)lvItem.lParam).iRelativeSort = iInsert;
 						}
 						else
 						{
 							if(iSort == iInsert)
 								iSort++;
 
-							m_pExtraItemInfo[(int)lvItem.lParam].iRelativeSort = iSort;
+							m_itemInfoMap.at((int)lvItem.lParam).iRelativeSort = iSort;
 						}
 					}
 
@@ -619,7 +615,7 @@ void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
 				have to be 'snapped' to the nearest item position.
 				Otherwise, they may simply be placed where they are
 				dropped. */
-				if(m_bAutoArrange)
+				if(m_folderSettings.autoArrange)
 				{
 					LVFINDINFO lvfi;
 					LVHITTESTINFO lvhti;
@@ -746,7 +742,7 @@ void CShellBrowser::RepositionLocalFiles(const POINT *ppt)
 		}
 	}
 
-	if(m_bAutoArrange)
+	if(m_folderSettings.autoArrange)
 		NListView::ListView_SetAutoArrange(m_hListView,TRUE);
 
 	m_bDragging = FALSE;

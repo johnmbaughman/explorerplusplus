@@ -1,31 +1,30 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: Settings.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Processes and forwards incoming messages for the main
- * window.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++.h"
 #include "AddBookmarkDialog.h"
-#include "ManageBookmarksDialog.h"
-#include "IModelessDialogNotification.h"
-#include "ModelessDialogs.h"
+#include "AddressBar.h"
+#include "ApplicationToolbar.h"
+#include "Config.h"
+#include "DrivesToolbar.h"
 #include "HolderWindow.h"
+#include "IModelessDialogNotification.h"
 #include "MainResource.h"
+#include "ManageBookmarksDialog.h"
+#include "MenuRanges.h"
+#include "ModelessDialogs.h"
+#include "ShellBrowser/SortModes.h"
+#include "ShellBrowser/ViewModes.h"
+#include "ToolbarButtons.h"
 #include "../DisplayWindow/DisplayWindow.h"
-#include "../Helper/ShellHelper.h"
-#include "../Helper/ListViewHelper.h"
 #include "../Helper/Controls.h"
-#include "../Helper/WindowHelper.h"
+#include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/WindowHelper.h"
+#include "../MyTreeView/MyTreeView.h"
 
 
 static const int FOLDER_SIZE_LINE_INDEX = 1;
@@ -95,16 +94,26 @@ LRESULT CALLBACK Explorerplusplus::WindowProcedure(HWND hwnd,UINT Msg,WPARAM wPa
 		OnDeviceChange(wParam,lParam);
 		break;
 
+	case WM_TIMER:
+		if (wParam == AUTOSAVE_TIMER_ID)
+		{
+			SaveAllSettings();
+		}
+		break;
+
 	case WM_USER_UPDATEWINDOWS:
 		UpdateWindowStates();
 		break;
 
 	case WM_USER_FILESADDED:
-		/* Runs in the context of the main thread. Either
-		occurs after the specified tab index has been
-		freed (in which case nothing happens), or before. */
-		if(CheckTabIdStatus((int)wParam))
-			m_pShellBrowser[static_cast<int>(wParam)]->DirectoryAltered();
+	{
+		Tab *tab = m_tabContainer->GetTabOptional(static_cast<int>(wParam));
+
+		if (tab)
+		{
+			tab->GetShellBrowser()->DirectoryAltered();
+		}
+	}
 		break;
 
 	case WM_USER_TREEVIEW_GAINEDFOCUS:
@@ -123,24 +132,6 @@ LRESULT CALLBACK Explorerplusplus::WindowProcedure(HWND hwnd,UINT Msg,WPARAM wPa
 		OnShellNewItemCreated(lParam);
 		break;
 
-	case WM_USER_FOLDEREMPTY:
-		{
-			if((BOOL)lParam == TRUE)
-				NListView::ListView_SetBackgroundImage(m_hListView.at((int)wParam),IDB_FOLDEREMPTY);
-			else
-				NListView::ListView_SetBackgroundImage(m_hListView.at((int)wParam),NULL);
-		}
-		break;
-
-	case WM_USER_FILTERINGAPPLIED:
-		{
-			if((BOOL)lParam == TRUE)
-				NListView::ListView_SetBackgroundImage(m_hListView.at((int)wParam),IDB_FILTERINGAPPLIED);
-			else
-				NListView::ListView_SetBackgroundImage(m_hListView.at((int)wParam),NULL);
-		}
-		break;
-
 	case WM_USER_DIRECTORYMODIFIED:
 		OnDirectoryModified((int)wParam);
 		break;
@@ -153,7 +144,7 @@ LRESULT CALLBACK Explorerplusplus::WindowProcedure(HWND hwnd,UINT Msg,WPARAM wPa
 		{
 			RECT	rc;
 
-			m_TreeViewWidth = (int)lParam + TREEVIEW_DRAG_OFFSET;
+			m_config->treeViewWidth = (int)lParam + TREEVIEW_DRAG_OFFSET;
 
 			GetClientRect(m_hContainer,&rc);
 
@@ -195,7 +186,8 @@ LRESULT CALLBACK Explorerplusplus::WindowProcedure(HWND hwnd,UINT Msg,WPARAM wPa
 			if(bValid)
 			{
 				FormatSizeString(pDWFolderSizeCompletion->liFolderSize,szFolderSize,
-					SIZEOF_ARRAY(szFolderSize),m_bForceSize,m_SizeDisplayFormat);
+					SIZEOF_ARRAY(szFolderSize),m_config->globalFolderSettings.forceSize,
+					m_config->globalFolderSettings.sizeDisplayFormat);
 
 				LoadString(m_hLanguageModule,IDS_GENERAL_TOTALSIZE,
 					szTotalSize,SIZEOF_ARRAY(szTotalSize));
@@ -217,15 +209,15 @@ LRESULT CALLBACK Explorerplusplus::WindowProcedure(HWND hwnd,UINT Msg,WPARAM wPa
 
 			if (pcds->lpData != NULL)
 			{
-				BrowseFolder((TCHAR *)pcds->lpData, SBSP_ABSOLUTE, TRUE, TRUE, FALSE);
+				CreateNewTab((TCHAR *)pcds->lpData, TabSettings(_selected = true));
 			}
 			else
 			{
-				HRESULT hr = BrowseFolder(m_DefaultTabDirectory, SBSP_ABSOLUTE, TRUE, TRUE, FALSE);
+				HRESULT hr = CreateNewTab(m_config->defaultTabDirectory.c_str(), TabSettings(_selected = true));
 
 				if (FAILED(hr))
 				{
-					BrowseFolder(m_DefaultTabDirectoryStatic, SBSP_ABSOLUTE, TRUE, TRUE, FALSE);
+					CreateNewTab(m_config->defaultTabDirectoryStatic.c_str(), TabSettings(_selected = true));
 				}
 			}
 
@@ -327,12 +319,25 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 		{
 			m_pActiveShellBrowser->ImportColumns(&m_pActiveColumnList);
 
-			RefreshTab(m_selectedTabId);
+			Tab &tab = m_tabContainer->GetTab(m_selectedTabId);
+			RefreshTab(tab);
 		}
 		else
 		{
 			m_pActiveShellBrowser->ImportColumns(&m_pActiveColumnList);
 		}
+	}
+	else if (!HIWORD(wParam) && LOWORD(wParam) >= MENU_PLUGIN_STARTID &&
+		LOWORD(wParam) < MENU_PLUGIN_ENDID)
+	{
+		m_pluginMenuManager.OnMenuItemClicked(LOWORD(wParam));
+		return 0;
+	}
+	else if (HIWORD(wParam) && LOWORD(wParam) >= ACCELERATOR_PLUGIN_STARTID &&
+		LOWORD(wParam) < ACCELERATOR_PLUGIN_ENDID)
+	{
+		m_pluginCommandManager.onAcceleratorPressed(LOWORD(wParam));
+		return 0;
 	}
 
 	switch(LOWORD(wParam))
@@ -386,12 +391,12 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 
 		case TOOLBAR_DELETE:
 		case IDM_FILE_DELETE:
-			OnFileDelete(FALSE);
+			OnFileDelete(false);
 			break;
 
 		case TOOLBAR_DELETEPERMANENTLY:
 		case IDM_FILE_DELETEPERMANENTLY:
-			OnFileDelete(TRUE);
+			OnFileDelete(true);
 			break;
 
 		case IDM_FILE_RENAME:
@@ -438,12 +443,12 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 
 		case IDM_EDIT_COPYTOFOLDER:
 		case TOOLBAR_COPYTO:
-			CopyToFolder(FALSE);
+			CopyToFolder(false);
 			break;
 
 		case TOOLBAR_MOVETO:
 		case IDM_EDIT_MOVETOFOLDER:
-			CopyToFolder(TRUE);
+			CopyToFolder(true);
 			break;
 
 		case IDM_EDIT_SELECTALL:
@@ -483,8 +488,8 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDM_VIEW_STATUSBAR:
-			m_bShowStatusBar = !m_bShowStatusBar;
-			lShowWindow(m_hStatusBar,m_bShowStatusBar);
+			m_config->showStatusBar = !m_config->showStatusBar;
+			lShowWindow(m_hStatusBar, m_config->showStatusBar);
 			ResizeWindows();
 			break;
 
@@ -494,42 +499,42 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDM_VIEW_DISPLAYWINDOW:
-			m_bShowDisplayWindow = !m_bShowDisplayWindow;
-			lShowWindow(m_hDisplayWindow,m_bShowDisplayWindow);
+			m_config->showDisplayWindow = !m_config->showDisplayWindow;
+			lShowWindow(m_hDisplayWindow,m_config->showDisplayWindow);
 			ResizeWindows();
 			break;
 
 		case IDM_TOOLBARS_ADDRESSBAR:
-			m_bShowAddressBar = !m_bShowAddressBar;
-			ShowMainRebarBand(m_hAddressBar,m_bShowAddressBar);
+			m_config->showAddressBar = !m_config->showAddressBar;
+			ShowMainRebarBand(m_addressBar->GetHWND(), m_config->showAddressBar);
 			AdjustFolderPanePosition();
 			ResizeWindows();
 			break;
 
 		case IDM_TOOLBARS_MAINTOOLBAR:
-			m_bShowMainToolbar = !m_bShowMainToolbar;
-			ShowMainRebarBand(m_hMainToolbar,m_bShowMainToolbar);
+			m_config->showMainToolbar = !m_config->showMainToolbar;
+			ShowMainRebarBand(m_mainToolbar->GetHWND(),m_config->showMainToolbar);
 			AdjustFolderPanePosition();
 			ResizeWindows();
 			break;
 
 		case IDM_TOOLBARS_BOOKMARKSTOOLBAR:
-			m_bShowBookmarksToolbar = !m_bShowBookmarksToolbar;
-			ShowMainRebarBand(m_hBookmarksToolbar,m_bShowBookmarksToolbar);
+			m_config->showBookmarksToolbar = !m_config->showBookmarksToolbar;
+			ShowMainRebarBand(m_hBookmarksToolbar,m_config->showBookmarksToolbar);
 			AdjustFolderPanePosition();
 			ResizeWindows();
 			break;
 
 		case IDM_TOOLBARS_DRIVES:
-			m_bShowDrivesToolbar = !m_bShowDrivesToolbar;
-			ShowMainRebarBand(m_pDrivesToolbar->GetHWND(),m_bShowDrivesToolbar);
+			m_config->showDrivesToolbar = !m_config->showDrivesToolbar;
+			ShowMainRebarBand(m_pDrivesToolbar->GetHWND(),m_config->showDrivesToolbar);
 			AdjustFolderPanePosition();
 			ResizeWindows();
 			break;
 
 		case IDM_TOOLBARS_APPLICATIONTOOLBAR:
-			m_bShowApplicationToolbar = !m_bShowApplicationToolbar;
-			ShowMainRebarBand(m_pApplicationToolbar->GetHWND(),m_bShowApplicationToolbar);
+			m_config->showApplicationToolbar = !m_config->showApplicationToolbar;
+			ShowMainRebarBand(m_pApplicationToolbar->GetHWND(),m_config->showApplicationToolbar);
 			AdjustFolderPanePosition();
 			ResizeWindows();
 			break;
@@ -539,39 +544,39 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDM_TOOLBARS_CUSTOMIZE:
-			SendMessage(m_hMainToolbar,TB_CUSTOMIZE,0,0);
+			SendMessage(m_mainToolbar->GetHWND(),TB_CUSTOMIZE,0,0);
 			break;
 
 		case IDM_VIEW_EXTRALARGEICONS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_EXTRALARGEICONS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::ExtraLargeIcons);
 			break;
 
 		case IDM_VIEW_LARGEICONS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_LARGEICONS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::LargeIcons);
 			break;
 
 		case IDM_VIEW_ICONS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_ICONS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::Icons);
 			break;
 
 		case IDM_VIEW_SMALLICONS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_SMALLICONS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::SmallIcons);
 			break;
 
 		case IDM_VIEW_LIST:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_LIST);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::List);
 			break;
 
 		case IDM_VIEW_DETAILS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_DETAILS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::Details);
 			break;
 
 		case IDM_VIEW_THUMBNAILS:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_THUMBNAILS);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::Thumbnails);
 			break;
 
 		case IDM_VIEW_TILES:
-			m_pActiveShellBrowser->SetCurrentViewMode(VM_TILES);
+			m_pActiveShellBrowser->SetViewMode(ViewMode::Tiles);
 			break;
 
 		case IDM_VIEW_CHANGEDISPLAYCOLOURS:
@@ -583,503 +588,503 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDM_FILTER_APPLYFILTER:
-			SetFilterStatus();
+			ToggleFilterStatus();
 			break;
 
 		case IDM_SORTBY_NAME:
-			OnSortBy(FSM_NAME);
+			OnSortBy(SortMode::Name);
 			break;
 
 		case IDM_SORTBY_SIZE:
-			OnSortBy(FSM_SIZE);
+			OnSortBy(SortMode::Size);
 			break;
 
 		case IDM_SORTBY_TYPE:
-			OnSortBy(FSM_TYPE);
+			OnSortBy(SortMode::Type);
 			break;
 
 		case IDM_SORTBY_DATEMODIFIED:
-			OnSortBy(FSM_DATEMODIFIED);
+			OnSortBy(SortMode::DateModified);
 			break;
 
 		case IDM_SORTBY_TOTALSIZE:
-			OnSortBy(FSM_TOTALSIZE);
+			OnSortBy(SortMode::TotalSize);
 			break;
 
 		case IDM_SORTBY_FREESPACE:
-			OnSortBy(FSM_FREESPACE);
+			OnSortBy(SortMode::FreeSpace);
 			break;
 
 		case IDM_SORTBY_DATEDELETED:
-			OnSortBy(FSM_DATEDELETED);
+			OnSortBy(SortMode::DateDeleted);
 			break;
 
 		case IDM_SORTBY_ORIGINALLOCATION:
-			OnSortBy(FSM_ORIGINALLOCATION);
+			OnSortBy(SortMode::OriginalLocation);
 			break;
 
 		case IDM_SORTBY_ATTRIBUTES:
-			OnSortBy(FSM_ATTRIBUTES);
+			OnSortBy(SortMode::Attributes);
 			break;
 
 		case IDM_SORTBY_REALSIZE:
-			OnSortBy(FSM_REALSIZE);
+			OnSortBy(SortMode::RealSize);
 			break;
 
 		case IDM_SORTBY_SHORTNAME:
-			OnSortBy(FSM_SHORTNAME);
+			OnSortBy(SortMode::ShortName);
 			break;
 
 		case IDM_SORTBY_OWNER:
-			OnSortBy(FSM_OWNER);
+			OnSortBy(SortMode::Owner);
 			break;
 
 		case IDM_SORTBY_PRODUCTNAME:
-			OnSortBy(FSM_PRODUCTNAME);
+			OnSortBy(SortMode::ProductName);
 			break;
 
 		case IDM_SORTBY_COMPANY:
-			OnSortBy(FSM_COMPANY);
+			OnSortBy(SortMode::Company);
 			break;
 
 		case IDM_SORTBY_DESCRIPTION:
-			OnSortBy(FSM_DESCRIPTION);
+			OnSortBy(SortMode::Description);
 			break;
 
 		case IDM_SORTBY_FILEVERSION:
-			OnSortBy(FSM_FILEVERSION);
+			OnSortBy(SortMode::FileVersion);
 			break;
 
 		case IDM_SORTBY_PRODUCTVERSION:
-			OnSortBy(FSM_PRODUCTVERSION);
+			OnSortBy(SortMode::ProductVersion);
 			break;
 
 		case IDM_SORTBY_SHORTCUTTO:
-			OnSortBy(FSM_SHORTCUTTO);
+			OnSortBy(SortMode::ShortcutTo);
 			break;
 
 		case IDM_SORTBY_HARDLINKS:
-			OnSortBy(FSM_HARDLINKS);
+			OnSortBy(SortMode::HardLinks);
 			break;
 
 		case IDM_SORTBY_EXTENSION:
-			OnSortBy(FSM_EXTENSION);
+			OnSortBy(SortMode::Extension);
 			break;
 
 		case IDM_SORTBY_CREATED:
-			OnSortBy(FSM_CREATED);
+			OnSortBy(SortMode::Created);
 			break;
 
 		case IDM_SORTBY_ACCESSED:
-			OnSortBy(FSM_ACCESSED);
+			OnSortBy(SortMode::Accessed);
 			break;
 
 		case IDM_SORTBY_TITLE:
-			OnSortBy(FSM_TITLE);
+			OnSortBy(SortMode::Title);
 			break;
 
 		case IDM_SORTBY_SUBJECT:
-			OnSortBy(FSM_SUBJECT);
+			OnSortBy(SortMode::Subject);
 			break;
 
 		case IDM_SORTBY_AUTHOR:
-			OnSortBy(FSM_AUTHORS);
+			OnSortBy(SortMode::Authors);
 			break;
 
 		case IDM_SORTBY_KEYWORDS:
-			OnSortBy(FSM_KEYWORDS);
+			OnSortBy(SortMode::Keywords);
 			break;
 
 		case IDM_SORTBY_COMMENTS:
-			OnSortBy(FSM_COMMENTS);
+			OnSortBy(SortMode::Comments);
 			break;
 
 		case IDM_SORTBY_CAMERAMODEL:
-			OnSortBy(FSM_CAMERAMODEL);
+			OnSortBy(SortMode::CameraModel);
 			break;
 
 		case IDM_SORTBY_DATETAKEN:
-			OnSortBy(FSM_DATETAKEN);
+			OnSortBy(SortMode::DateTaken);
 			break;
 
 		case IDM_SORTBY_WIDTH:
-			OnSortBy(FSM_WIDTH);
+			OnSortBy(SortMode::Width);
 			break;
 
 		case IDM_SORTBY_HEIGHT:
-			OnSortBy(FSM_HEIGHT);
+			OnSortBy(SortMode::Height);
 			break;
 
 		case IDM_SORTBY_VIRTUALCOMMENTS:
-			OnSortBy(FSM_VIRTUALCOMMENTS);
+			OnSortBy(SortMode::VirtualComments);
 			break;
 
 		case IDM_SORTBY_FILESYSTEM:
-			OnSortBy(FSM_FILESYSTEM);
+			OnSortBy(SortMode::FileSystem);
 			break;
 
 		case IDM_SORTBY_NUMPRINTERDOCUMENTS:
-			OnSortBy(FSM_NUMPRINTERDOCUMENTS);
+			OnSortBy(SortMode::NumPrinterDocuments);
 			break;
 
 		case IDM_SORTBY_PRINTERSTATUS:
-			OnSortBy(FSM_PRINTERSTATUS);
+			OnSortBy(SortMode::PrinterStatus);
 			break;
 
 		case IDM_SORTBY_PRINTERCOMMENTS:
-			OnSortBy(FSM_PRINTERCOMMENTS);
+			OnSortBy(SortMode::PrinterComments);
 			break;
 
 		case IDM_SORTBY_PRINTERLOCATION:
-			OnSortBy(FSM_PRINTERLOCATION);
+			OnSortBy(SortMode::PrinterLocation);
 			break;
 
 		case IDM_SORTBY_NETWORKADAPTER_STATUS:
-			OnSortBy(FSM_NETWORKADAPTER_STATUS);
+			OnSortBy(SortMode::NetworkAdapterStatus);
 			break;
 
 		case IDM_SORTBY_MEDIA_BITRATE:
-			OnSortBy(FSM_MEDIA_BITRATE);
+			OnSortBy(SortMode::MediaBitrate);
 			break;
 
 		case IDM_SORTBY_MEDIA_COPYRIGHT:
-			OnSortBy(FSM_MEDIA_COPYRIGHT);
+			OnSortBy(SortMode::MediaCopyright);
 			break;
 
 		case IDM_SORTBY_MEDIA_DURATION:
-			OnSortBy(FSM_MEDIA_DURATION);
+			OnSortBy(SortMode::MediaDuration);
 			break;
 
 		case IDM_SORTBY_MEDIA_PROTECTED:
-			OnSortBy(FSM_MEDIA_PROTECTED);
+			OnSortBy(SortMode::MediaProtected);
 			break;
 
 		case IDM_SORTBY_MEDIA_RATING:
-			OnSortBy(FSM_MEDIA_RATING);
+			OnSortBy(SortMode::MediaRating);
 			break;
 
 		case IDM_SORTBY_MEDIA_ALBUM_ARTIST:
-			OnSortBy(FSM_MEDIA_ALBUMARTIST);
+			OnSortBy(SortMode::MediaAlbumArtist);
 			break;
 
 		case IDM_SORTBY_MEDIA_ALBUM:
-			OnSortBy(FSM_MEDIA_ALBUM);
+			OnSortBy(SortMode::MediaAlbum);
 			break;
 
 		case IDM_SORTBY_MEDIA_BEATS_PER_MINUTE:
-			OnSortBy(FSM_MEDIA_BEATSPERMINUTE);
+			OnSortBy(SortMode::MediaBeatsPerMinute);
 			break;
 
 		case IDM_SORTBY_MEDIA_COMPOSER:
-			OnSortBy(FSM_MEDIA_COMPOSER);
+			OnSortBy(SortMode::MediaComposer);
 			break;
 
 		case IDM_SORTBY_MEDIA_CONDUCTOR:
-			OnSortBy(FSM_MEDIA_CONDUCTOR);
+			OnSortBy(SortMode::MediaConductor);
 			break;
 
 		case IDM_SORTBY_MEDIA_DIRECTOR:
-			OnSortBy(FSM_MEDIA_DIRECTOR);
+			OnSortBy(SortMode::MediaDirector);
 			break;
 
 		case IDM_SORTBY_MEDIA_GENRE:
-			OnSortBy(FSM_MEDIA_GENRE);
+			OnSortBy(SortMode::MediaGenre);
 			break;
 
 		case IDM_SORTBY_MEDIA_LANGUAGE:
-			OnSortBy(FSM_MEDIA_LANGUAGE);
+			OnSortBy(SortMode::MediaLanguage);
 			break;
 
 		case IDM_SORTBY_MEDIA_BROADCAST_DATE:
-			OnSortBy(FSM_MEDIA_BROADCASTDATE);
+			OnSortBy(SortMode::MediaBroadcastDate);
 			break;
 
 		case IDM_SORTBY_MEDIA_CHANNEL:
-			OnSortBy(FSM_MEDIA_CHANNEL);
+			OnSortBy(SortMode::MediaChannel);
 			break;
 
 		case IDM_SORTBY_MEDIA_STATION_NAME:
-			OnSortBy(FSM_MEDIA_STATIONNAME);
+			OnSortBy(SortMode::MediaStationName);
 			break;
 
 		case IDM_SORTBY_MEDIA_MOOD:
-			OnSortBy(FSM_MEDIA_MOOD);
+			OnSortBy(SortMode::MediaMood);
 			break;
 
 		case IDM_SORTBY_MEDIA_PARENTAL_RATING:
-			OnSortBy(FSM_MEDIA_PARENTALRATING);
+			OnSortBy(SortMode::MediaParentalRating);
 			break;
 
 		case IDM_SORTBY_MEDIA_PARENTAL_RATNG_REASON:
-			OnSortBy(FSM_MEDIA_PARENTALRATINGREASON);
+			OnSortBy(SortMode::MediaParentalRatingReason);
 			break;
 
 		case IDM_SORTBY_MEDIA_PERIOD:
-			OnSortBy(FSM_MEDIA_PERIOD);
+			OnSortBy(SortMode::MediaPeriod);
 			break;
 
 		case IDM_SORTBY_MEDIA_PRODUCER:
-			OnSortBy(FSM_MEDIA_PRODUCER);
+			OnSortBy(SortMode::MediaProducer);
 			break;
 
 		case IDM_SORTBY_MEDIA_PUBLISHER:
-			OnSortBy(FSM_MEDIA_PUBLISHER);
+			OnSortBy(SortMode::MediaPublisher);
 			break;
 
 		case IDM_SORTBY_MEDIA_WRITER:
-			OnSortBy(FSM_MEDIA_WRITER);
+			OnSortBy(SortMode::MediaWriter);
 			break;
 
 		case IDM_SORTBY_MEDIA_YEAR:
-			OnSortBy(FSM_MEDIA_YEAR);
+			OnSortBy(SortMode::MediaYear);
 			break;
 
 		case IDM_GROUPBY_NAME:
-			OnGroupBy(FSM_NAME);
+			OnGroupBy(SortMode::Name);
 			break;
 
 		case IDM_GROUPBY_SIZE:
-			OnGroupBy(FSM_SIZE);
+			OnGroupBy(SortMode::Size);
 			break;
 
 		case IDM_GROUPBY_TYPE:
-			OnGroupBy(FSM_TYPE);
+			OnGroupBy(SortMode::Type);
 			break;
 
 		case IDM_GROUPBY_DATEMODIFIED:
-			OnGroupBy(FSM_DATEMODIFIED);
+			OnGroupBy(SortMode::DateModified);
 			break;
 
 		case IDM_GROUPBY_TOTALSIZE:
-			OnGroupBy(FSM_TOTALSIZE);
+			OnGroupBy(SortMode::TotalSize);
 			break;
 
 		case IDM_GROUPBY_FREESPACE:
-			OnGroupBy(FSM_FREESPACE);
+			OnGroupBy(SortMode::FreeSpace);
 			break;
 
 		case IDM_GROUPBY_DATEDELETED:
-			OnGroupBy(FSM_DATEDELETED);
+			OnGroupBy(SortMode::DateDeleted);
 			break;
 
 		case IDM_GROUPBY_ORIGINALLOCATION:
-			OnGroupBy(FSM_ORIGINALLOCATION);
+			OnGroupBy(SortMode::OriginalLocation);
 			break;
 
 		case IDM_GROUPBY_ATTRIBUTES:
-			OnGroupBy(FSM_ATTRIBUTES);
+			OnGroupBy(SortMode::Attributes);
 			break;
 
 		case IDM_GROUPBY_REALSIZE:
-			OnGroupBy(FSM_REALSIZE);
+			OnGroupBy(SortMode::RealSize);
 			break;
 
 		case IDM_GROUPBY_SHORTNAME:
-			OnGroupBy(FSM_SHORTNAME);
+			OnGroupBy(SortMode::ShortName);
 			break;
 
 		case IDM_GROUPBY_OWNER:
-			OnGroupBy(FSM_OWNER);
+			OnGroupBy(SortMode::Owner);
 			break;
 
 		case IDM_GROUPBY_PRODUCTNAME:
-			OnGroupBy(FSM_PRODUCTNAME);
+			OnGroupBy(SortMode::ProductName);
 			break;
 
 		case IDM_GROUPBY_COMPANY:
-			OnGroupBy(FSM_COMPANY);
+			OnGroupBy(SortMode::Company);
 			break;
 
 		case IDM_GROUPBY_DESCRIPTION:
-			OnGroupBy(FSM_DESCRIPTION);
+			OnGroupBy(SortMode::Description);
 			break;
 
 		case IDM_GROUPBY_FILEVERSION:
-			OnGroupBy(FSM_FILEVERSION);
+			OnGroupBy(SortMode::FileVersion);
 			break;
 
 		case IDM_GROUPBY_PRODUCTVERSION:
-			OnGroupBy(FSM_PRODUCTVERSION);
+			OnGroupBy(SortMode::ProductVersion);
 			break;
 
 		case IDM_GROUPBY_SHORTCUTTO:
-			OnGroupBy(FSM_SHORTCUTTO);
+			OnGroupBy(SortMode::ShortcutTo);
 			break;
 
 		case IDM_GROUPBY_HARDLINKS:
-			OnGroupBy(FSM_HARDLINKS);
+			OnGroupBy(SortMode::HardLinks);
 			break;
 
 		case IDM_GROUPBY_EXTENSION:
-			OnGroupBy(FSM_EXTENSION);
+			OnGroupBy(SortMode::Extension);
 			break;
 
 		case IDM_GROUPBY_CREATED:
-			OnGroupBy(FSM_CREATED);
+			OnGroupBy(SortMode::Created);
 			break;
 
 		case IDM_GROUPBY_ACCESSED:
-			OnGroupBy(FSM_ACCESSED);
+			OnGroupBy(SortMode::Accessed);
 			break;
 
 		case IDM_GROUPBY_TITLE:
-			OnGroupBy(FSM_TITLE);
+			OnGroupBy(SortMode::Title);
 			break;
 
 		case IDM_GROUPBY_SUBJECT:
-			OnGroupBy(FSM_SUBJECT);
+			OnGroupBy(SortMode::Subject);
 			break;
 
 		case IDM_GROUPBY_AUTHOR:
-			OnGroupBy(FSM_AUTHORS);
+			OnGroupBy(SortMode::Authors);
 			break;
 
 		case IDM_GROUPBY_KEYWORDS:
-			OnGroupBy(FSM_KEYWORDS);
+			OnGroupBy(SortMode::Keywords);
 			break;
 
 		case IDM_GROUPBY_COMMENTS:
-			OnGroupBy(FSM_COMMENTS);
+			OnGroupBy(SortMode::Comments);
 			break;
 
 		case IDM_GROUPBY_CAMERAMODEL:
-			OnGroupBy(FSM_CAMERAMODEL);
+			OnGroupBy(SortMode::CameraModel);
 			break;
 
 		case IDM_GROUPBY_DATETAKEN:
-			OnGroupBy(FSM_DATETAKEN);
+			OnGroupBy(SortMode::DateTaken);
 			break;
 
 		case IDM_GROUPBY_WIDTH:
-			OnGroupBy(FSM_WIDTH);
+			OnGroupBy(SortMode::Width);
 			break;
 
 		case IDM_GROUPBY_HEIGHT:
-			OnGroupBy(FSM_HEIGHT);
+			OnGroupBy(SortMode::Height);
 			break;
 
 		case IDM_GROUPBY_VIRTUALCOMMENTS:
-			OnGroupBy(FSM_VIRTUALCOMMENTS);
+			OnGroupBy(SortMode::VirtualComments);
 			break;
 
 		case IDM_GROUPBY_FILESYSTEM:
-			OnGroupBy(FSM_FILESYSTEM);
+			OnGroupBy(SortMode::FileSystem);
 			break;
 
 		case IDM_GROUPBY_NUMPRINTERDOCUMENTS:
-			OnGroupBy(FSM_NUMPRINTERDOCUMENTS);
+			OnGroupBy(SortMode::NumPrinterDocuments);
 			break;
 
 		case IDM_GROUPBY_PRINTERSTATUS:
-			OnGroupBy(FSM_PRINTERSTATUS);
+			OnGroupBy(SortMode::PrinterStatus);
 			break;
 
 		case IDM_GROUPBY_PRINTERCOMMENTS:
-			OnGroupBy(FSM_PRINTERCOMMENTS);
+			OnGroupBy(SortMode::PrinterComments);
 			break;
 
 		case IDM_GROUPBY_PRINTERLOCATION:
-			OnGroupBy(FSM_PRINTERLOCATION);
+			OnGroupBy(SortMode::PrinterLocation);
 			break;
 
 		case IDM_GROUPBY_NETWORKADAPTER_STATUS:
-			OnGroupBy(FSM_NETWORKADAPTER_STATUS);
+			OnGroupBy(SortMode::NetworkAdapterStatus);
 			break;
 
 		case IDM_GROUPBY_MEDIA_BITRATE:
-			OnGroupBy(FSM_MEDIA_BITRATE);
+			OnGroupBy(SortMode::MediaBitrate);
 			break;
 
 		case IDM_GROUPBY_MEDIA_COPYRIGHT:
-			OnGroupBy(FSM_MEDIA_COPYRIGHT);
+			OnGroupBy(SortMode::MediaCopyright);
 			break;
 
 		case IDM_GROUPBY_MEDIA_DURATION:
-			OnGroupBy(FSM_MEDIA_DURATION);
+			OnGroupBy(SortMode::MediaDuration);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PROTECTED:
-			OnGroupBy(FSM_MEDIA_PROTECTED);
+			OnGroupBy(SortMode::MediaProtected);
 			break;
 
 		case IDM_GROUPBY_MEDIA_RATING:
-			OnGroupBy(FSM_MEDIA_RATING);
+			OnGroupBy(SortMode::MediaRating);
 			break;
 
 		case IDM_GROUPBY_MEDIA_ALBUM_ARTIST:
-			OnGroupBy(FSM_MEDIA_ALBUMARTIST);
+			OnGroupBy(SortMode::MediaAlbumArtist);
 			break;
 
 		case IDM_GROUPBY_MEDIA_ALBUM:
-			OnGroupBy(FSM_MEDIA_ALBUM);
+			OnGroupBy(SortMode::MediaAlbum);
 			break;
 
 		case IDM_GROUPBY_MEDIA_BEATS_PER_MINUTE:
-			OnGroupBy(FSM_MEDIA_BEATSPERMINUTE);
+			OnGroupBy(SortMode::MediaBeatsPerMinute);
 			break;
 
 		case IDM_GROUPBY_MEDIA_COMPOSER:
-			OnGroupBy(FSM_MEDIA_COMPOSER);
+			OnGroupBy(SortMode::MediaComposer);
 			break;
 
 		case IDM_GROUPBY_MEDIA_CONDUCTOR:
-			OnGroupBy(FSM_MEDIA_CONDUCTOR);
+			OnGroupBy(SortMode::MediaConductor);
 			break;
 
 		case IDM_GROUPBY_MEDIA_DIRECTOR:
-			OnGroupBy(FSM_MEDIA_DIRECTOR);
+			OnGroupBy(SortMode::MediaDirector);
 			break;
 
 		case IDM_GROUPBY_MEDIA_GENRE:
-			OnGroupBy(FSM_MEDIA_GENRE);
+			OnGroupBy(SortMode::MediaGenre);
 			break;
 
 		case IDM_GROUPBY_MEDIA_LANGUAGE:
-			OnGroupBy(FSM_MEDIA_LANGUAGE);
+			OnGroupBy(SortMode::MediaLanguage);
 			break;
 
 		case IDM_GROUPBY_MEDIA_BROADCAST_DATE:
-			OnGroupBy(FSM_MEDIA_BROADCASTDATE);
+			OnGroupBy(SortMode::MediaBroadcastDate);
 			break;
 
 		case IDM_GROUPBY_MEDIA_CHANNEL:
-			OnGroupBy(FSM_MEDIA_CHANNEL);
+			OnGroupBy(SortMode::MediaChannel);
 			break;
 
 		case IDM_GROUPBY_MEDIA_STATION_NAME:
-			OnGroupBy(FSM_MEDIA_STATIONNAME);
+			OnGroupBy(SortMode::MediaStationName);
 			break;
 
 		case IDM_GROUPBY_MEDIA_MOOD:
-			OnGroupBy(FSM_MEDIA_MOOD);
+			OnGroupBy(SortMode::MediaMood);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PARENTAL_RATING:
-			OnGroupBy(FSM_MEDIA_PARENTALRATING);
+			OnGroupBy(SortMode::MediaParentalRating);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PARENTAL_RATING_REASON:
-			OnGroupBy(FSM_MEDIA_PARENTALRATINGREASON);
+			OnGroupBy(SortMode::MediaParentalRatingReason);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PERIOD:
-			OnGroupBy(FSM_MEDIA_PERIOD);
+			OnGroupBy(SortMode::MediaPeriod);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PRODUCER:
-			OnGroupBy(FSM_MEDIA_PRODUCER);
+			OnGroupBy(SortMode::MediaProducer);
 			break;
 
 		case IDM_GROUPBY_MEDIA_PUBLISHER:
-			OnGroupBy(FSM_MEDIA_PUBLISHER);
+			OnGroupBy(SortMode::MediaPublisher);
 			break;
 
 		case IDM_GROUPBY_MEDIA_WRITER:
-			OnGroupBy(FSM_MEDIA_WRITER);
+			OnGroupBy(SortMode::MediaWriter);
 			break;
 
 		case IDM_GROUPBY_MEDIA_YEAR:
-			OnGroupBy(FSM_MEDIA_YEAR);
+			OnGroupBy(SortMode::MediaYear);
 			break;
 
 		case IDM_ARRANGEICONSBY_ASCENDING:
@@ -1091,11 +1096,7 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 			
 		case IDM_ARRANGEICONSBY_AUTOARRANGE:
-			m_pActiveShellBrowser->ToggleAutoArrange();
-			break;
-
-		case IDM_ARRANGEICONSBY_SHOWINGROUPS:
-			m_pActiveShellBrowser->ToggleGrouping();
+			m_pActiveShellBrowser->SetAutoArrange(!m_pActiveShellBrowser->GetAutoArrange());
 			break;
 
 		case IDM_VIEW_SHOWHIDDENFILES:
@@ -1220,47 +1221,47 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDM_GO_MYCOMPUTER:
-			GotoFolder(CSIDL_DRIVES);
+			OnGotoFolder(CSIDL_DRIVES);
 			break;
 
 		case IDM_GO_MYDOCUMENTS:
-			GotoFolder(CSIDL_PERSONAL);
+			OnGotoFolder(CSIDL_PERSONAL);
 			break;
 
 		case IDM_GO_MYMUSIC:
-			GotoFolder(CSIDL_MYMUSIC);
+			OnGotoFolder(CSIDL_MYMUSIC);
 			break;
 
 		case IDM_GO_MYPICTURES:
-			GotoFolder(CSIDL_MYPICTURES);
+			OnGotoFolder(CSIDL_MYPICTURES);
 			break;
 
 		case IDM_GO_DESKTOP:
-			GotoFolder(CSIDL_DESKTOP);
+			OnGotoFolder(CSIDL_DESKTOP);
 			break;
 
 		case IDM_GO_RECYCLEBIN:
-			GotoFolder(CSIDL_BITBUCKET);
+			OnGotoFolder(CSIDL_BITBUCKET);
 			break;
 
 		case IDM_GO_CONTROLPANEL:
-			GotoFolder(CSIDL_CONTROLS);
+			OnGotoFolder(CSIDL_CONTROLS);
 			break;
 
 		case IDM_GO_PRINTERS:
-			GotoFolder(CSIDL_PRINTERS);
+			OnGotoFolder(CSIDL_PRINTERS);
 			break;
 
 		case IDM_GO_CDBURNING:
-			GotoFolder(CSIDL_CDBURN_AREA);
+			OnGotoFolder(CSIDL_CDBURN_AREA);
 			break;
 
 		case IDM_GO_MYNETWORKPLACES:
-			GotoFolder(CSIDL_NETWORK);
+			OnGotoFolder(CSIDL_NETWORK);
 			break;
 
 		case IDM_GO_NETWORKCONNECTIONS:
-			GotoFolder(CSIDL_CONNECTIONS);
+			OnGotoFolder(CSIDL_CONNECTIONS);
 			break;
 
 		case TOOLBAR_ADDBOOKMARK:
@@ -1270,7 +1271,7 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 				TCHAR szDisplayName[MAX_PATH];
 				m_pActiveShellBrowser->QueryCurrentDirectory(SIZEOF_ARRAY(szCurrentDirectory),szCurrentDirectory);
 				GetDisplayName(szCurrentDirectory,szDisplayName,SIZEOF_ARRAY(szDisplayName),SHGDN_INFOLDER);
-				CBookmark Bookmark(szDisplayName,szCurrentDirectory,EMPTY_STRING);
+				CBookmark Bookmark = CBookmark::Create(szDisplayName,szCurrentDirectory,EMPTY_STRING);
 
 				CAddBookmarkDialog AddBookmarkDialog(m_hLanguageModule,IDD_ADD_BOOKMARK,hwnd,*m_bfAllBookmarks,Bookmark);
 				AddBookmarkDialog.ShowModalDialog();
@@ -1281,7 +1282,8 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 		case IDM_BOOKMARKS_MANAGEBOOKMARKS:
 			if(g_hwndManageBookmarks == NULL)
 			{
-				CManageBookmarksDialog *pManageBookmarksDialog = new CManageBookmarksDialog(m_hLanguageModule,IDD_MANAGE_BOOKMARKS,hwnd,this,*m_bfAllBookmarks);
+				CManageBookmarksDialog *pManageBookmarksDialog = new CManageBookmarksDialog(m_hLanguageModule,IDD_MANAGE_BOOKMARKS,
+					hwnd,this,this,*m_bfAllBookmarks);
 				g_hwndManageBookmarks = pManageBookmarksDialog->ShowModelessDialog(new CModelessDialogNotification());
 			}
 			else
@@ -1297,6 +1299,10 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 
 		case IDM_TOOLS_CUSTOMIZECOLORS:
 			OnCustomizeColors();
+			break;
+
+		case IDM_TOOLS_RUNSCRIPT:
+			OnRunScript();
 			break;
 
 		case IDM_TOOLS_OPTIONS:
@@ -1326,12 +1332,12 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDA_ADDRESSBAR:
-			SetFocus(m_hAddressBar);
+			SetFocus(m_addressBar->GetHWND());
 			break;
 
 		case IDA_COMBODROPDOWN:
-			SetFocus(m_hAddressBar);
-			SendMessage(m_hAddressBar,CB_SHOWDROPDOWN,TRUE,0);
+			SetFocus(m_addressBar->GetHWND());
+			SendMessage(m_addressBar->GetHWND(),CB_SHOWDROPDOWN,TRUE,0);
 			break;
 
 		case IDA_PREVIOUSWINDOW:
@@ -1347,11 +1353,11 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 			break;
 
 		case IDA_TAB_DUPLICATETAB:
-			OnDuplicateTab(m_selectedTabIndex);
+			DuplicateTab(m_tabContainer->GetSelectedTab());
 			break;
 
 		case IDA_HOME:
-			OnHome();
+			OnNavigateHome();
 			break;
 
 		case IDA_TAB1:
@@ -1422,8 +1428,8 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 
 		/* Display window menus. */
 		case IDM_DW_HIDEDISPLAYWINDOW:
-			m_bShowDisplayWindow = FALSE;
-			lShowWindow(m_hDisplayWindow,m_bShowDisplayWindow);
+			m_config->showDisplayWindow = FALSE;
+			lShowWindow(m_hDisplayWindow,m_config->showDisplayWindow);
 			ResizeWindows();
 			break;
 	}
@@ -1431,7 +1437,7 @@ LRESULT CALLBACK Explorerplusplus::CommandHandler(HWND hwnd,WPARAM wParam)
 	switch(HIWORD(wParam))
 	{
 		case CBN_DROPDOWN:
-			AddPathsToComboBoxEx(m_hAddressBar,m_CurrentDirectory);
+			AddPathsToComboBoxEx(m_addressBar->GetHWND(),m_CurrentDirectory);
 			break;
 	}
 
@@ -1448,7 +1454,7 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 	switch(nmhdr->code)
 	{
 		case NM_CLICK:
-			if(m_bOneClickActivate && !m_bSelectionFromNowhere)
+			if(m_config->globalFolderSettings.oneClickActivate && !m_bSelectionFromNowhere)
 			{
 				OnListViewDoubleClick(&((NMITEMACTIVATE *)lParam)->hdr);
 			}
@@ -1466,19 +1472,24 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 			return OnCustomDraw(lParam);
 			break;
 
-		case LVN_GETINFOTIP:
-			OnListViewGetInfoTip(lParam);
-			break;
-
 		case LVN_KEYDOWN:
 			return OnListViewKeyDown(lParam);
 			break;
 
 		case LVN_ITEMCHANGING:
 			{
-				UINT uViewMode = m_pActiveShellBrowser->GetCurrentViewMode();
+				int tabId = DetermineListViewObjectIndex(hwnd);
 
-				if(uViewMode == VM_LIST)
+				if (tabId == -1)
+				{
+					return FALSE;
+				}
+
+				Tab &tab = m_tabContainer->GetTab(tabId);
+
+				UINT uViewMode = tab.GetShellBrowser()->GetViewMode();
+
+				if(uViewMode == ViewMode::List)
 				{
 					if(m_bBlockNext)
 					{
@@ -1505,50 +1516,6 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 
 		case LVN_ENDLABELEDIT:
 			return OnListViewEndLabelEdit(lParam);
-			break;
-
-		case LVN_GETDISPINFO:
-			OnListViewGetDisplayInfo(lParam);
-			break;
-
-		case LVN_COLUMNCLICK:
-			OnListViewColumnClick(lParam);
-			break;
-
-		case CBEN_DRAGBEGIN:
-			OnAddressBarBeginDrag();
-			break;
-
-		case TBN_DROPDOWN:
-			return OnTbnDropDown(lParam);
-			break;
-
-		case TBN_INITCUSTOMIZE:
-			return TBNRF_HIDEHELP;
-			break;
-
-		case TBN_QUERYINSERT:
-			return OnTBQueryInsert();
-			break;
-
-		case TBN_QUERYDELETE:
-			return OnTBQueryDelete();
-			break;
-
-		case TBN_GETBUTTONINFO:
-			return OnTBGetButtonInfo(lParam);
-			break;
-
-		case TBN_RESTORE:
-			return OnTBRestore();
-			break;
-
-		case TBN_GETINFOTIP:
-			OnTBGetInfoTip(lParam);
-			break;
-
-		case TBN_RESET:
-			OnTBReset();
 			break;
 
 		case TBN_ENDADJUST:
@@ -1597,7 +1564,7 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 				switch(pnmrc->wID)
 				{
 				case ID_MAINTOOLBAR:
-					hToolbar = m_hMainToolbar;
+					hToolbar = m_mainToolbar->GetHWND();
 					break;
 
 				case ID_BOOKMARKSTOOLBAR:
@@ -1673,35 +1640,8 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 											break;
 
 										case TOOLBAR_VIEWS:
-											{
-												TCHAR szSubMenuText[512];
-												BOOL bRes;
-												int nItems;
-												int j = 0;
-
-												hSubMenu = CreateMenu();
-
-												nItems = GetMenuItemCount(m_hViewsMenu);
-
-												for(j = 0;j < nItems;j++)
-												{
-													mii.cbSize		= sizeof(mii);
-													mii.fMask		= MIIM_ID|MIIM_STRING;
-													mii.dwTypeData	= szSubMenuText;
-													mii.cch			= SIZEOF_ARRAY(szSubMenuText);
-													bRes = GetMenuItemInfo(m_hViewsMenu,j,TRUE,&mii);
-
-													if(bRes)
-													{
-														mii.cbSize		= sizeof(mii);
-														mii.fMask		= MIIM_ID|MIIM_STRING;
-														mii.dwTypeData	= szSubMenuText;
-														InsertMenuItem(hSubMenu,j,TRUE,&mii);
-													}
-												}
-
-												fMask |= MIIM_SUBMENU;
-											}
+											hSubMenu = BuildViewsMenu();
+											fMask |= MIIM_SUBMENU;
 											break;
 										}
 									}
@@ -1766,7 +1706,7 @@ LRESULT CALLBACK Explorerplusplus::NotifyHandler(HWND hwnd, UINT msg, WPARAM wPa
 
 						pidl = m_pActiveShellBrowser->RetrieveHistoryItem(iCmd);
 
-						BrowseFolder(pidl,SBSP_ABSOLUTE|SBSP_WRITENOHISTORY);
+						BrowseFolderInCurrentTab(pidl,SBSP_ABSOLUTE|SBSP_WRITENOHISTORY);
 
 						CoTaskMemFree(pidl);
 					}

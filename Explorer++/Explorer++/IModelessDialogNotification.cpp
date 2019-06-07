@@ -1,21 +1,12 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: IModelessDialogNotification.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles modeless dialog notifications.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
 #include "IModelessDialogNotification.h"
-#include "ModelessDialogs.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
+#include "ModelessDialogs.h"
 
 
 CModelessDialogNotification::CModelessDialogNotification() :
@@ -53,6 +44,10 @@ void CModelessDialogNotification::OnModelessDialogDestroy(int iResource)
 	{
 	case IDD_SEARCH:
 		g_hwndSearch = NULL;
+		break;
+
+	case IDD_SCRIPTING:
+		g_hwndRunScript = NULL;
 		break;
 
 	case IDD_MANAGE_BOOKMARKS:

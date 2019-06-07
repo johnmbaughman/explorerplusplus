@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: RenameTabDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Rename Tab' dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "Explorer++_internal.h"
@@ -22,26 +13,33 @@
 
 const TCHAR CRenameTabDialogPersistentSettings::SETTINGS_KEY[] = _T("RenameTab");
 
-CRenameTabDialog::CRenameTabDialog(HINSTANCE hInstance,
-	int iResource,HWND hParent,int iTab,IExplorerplusplus *pexpp) :
-CBaseDialog(hInstance,iResource,hParent,false)
+CRenameTabDialog::CRenameTabDialog(HINSTANCE hInstance, int iResource, HWND hParent,
+	int tabId, IExplorerplusplus *pexpp, CTabContainer *tabContainer,
+	TabContainerInterface *tabContainerInterface,TabInterface *ti) :
+	CBaseDialog(hInstance,iResource,hParent,false),
+	m_tabId(tabId),
+	m_pexpp(pexpp),
+	m_tabContainer(tabContainer),
+	m_tabContainerInterface(tabContainerInterface),
+	m_ti(ti)
 {
-	m_iTab = iTab;
-	m_pexpp = pexpp;
-
 	m_prtdps = &CRenameTabDialogPersistentSettings::GetInstance();
+
+	m_tabRemovedConnection = m_tabContainerInterface->AddTabRemovedObserver(boost::bind(&CRenameTabDialog::OnTabClosed, this, _1));
 }
 
 CRenameTabDialog::~CRenameTabDialog()
 {
-
+	m_tabRemovedConnection.disconnect();
 }
 
 INT_PTR CRenameTabDialog::OnInitDialog()
 {
 	HWND hEditName = GetDlgItem(m_hDlg,IDC_RENAMETAB_NEWTABNAME);
 
-	SetWindowText(hEditName,m_pexpp->GetTabName(m_iTab).c_str());
+	Tab *tab = m_tabContainer->GetTabOptional(m_tabId);
+
+	SetWindowText(hEditName, tab->GetName().c_str());
 
 	/* When this dialog is opened, the 'custom name' option will
 	be selected by default (whether or not that is the actual
@@ -110,25 +108,22 @@ void CRenameTabDialog::OnOk()
 
 	UINT uCheckStatus = IsDlgButtonChecked(m_hDlg,IDC_RENAMETAB_USEFOLDERNAME);
 
-	if(uCheckStatus == BST_CHECKED)
+	Tab *tab = m_tabContainer->GetTabOptional(m_tabId);
+
+	if (uCheckStatus == BST_CHECKED)
 	{
-		LPITEMIDLIST pidlDirectory = NULL;
-
-		pidlDirectory = m_pexpp->GetActiveShellBrowser()->QueryCurrentDirectoryIdl();
-		GetDisplayName(pidlDirectory,szTabText,SIZEOF_ARRAY(szTabText),SHGDN_INFOLDER);
-
-		CoTaskMemFree(pidlDirectory);
+		tab->ClearCustomName();
 	}
 	else
 	{
-		HWND hEditName = GetDlgItem(m_hDlg,IDC_RENAMETAB_NEWTABNAME);
+		HWND hEditName = GetDlgItem(m_hDlg, IDC_RENAMETAB_NEWTABNAME);
 
-		GetWindowText(hEditName,szTabText,SIZEOF_ARRAY(szTabText));
-	}
+		GetWindowText(hEditName, szTabText, SIZEOF_ARRAY(szTabText));
 
-	if(lstrlen(szTabText) > 0)
-	{
-		m_pexpp->SetTabName(m_iTab,szTabText,(uCheckStatus != BST_CHECKED));
+		if (lstrlen(szTabText) > 0)
+		{
+			tab->SetCustomName(szTabText);
+		}
 	}
 
 	EndDialog(m_hDlg,1);
@@ -137,6 +132,18 @@ void CRenameTabDialog::OnOk()
 void CRenameTabDialog::OnCancel()
 {
 	EndDialog(m_hDlg,0);
+}
+
+void CRenameTabDialog::OnTabClosed(int tabId)
+{
+	if (tabId == m_tabId)
+	{
+		// Although tabs can't be closed from the user interface while
+		// this dialog is open, plugins can close tabs at any time,
+		// meaning the tab this dialog is renaming could be closed while
+		// the dialog is open.
+		EndDialog(m_hDlg, 0);
+	}
 }
 
 void CRenameTabDialog::SaveState()

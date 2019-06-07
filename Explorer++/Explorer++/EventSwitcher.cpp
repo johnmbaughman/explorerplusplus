@@ -1,19 +1,15 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: EvenSwitcher.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Switches events based on the currently selected window
  * (principally the listview and treeview).
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "Explorer++_internal.h"
 
 void Explorerplusplus::OnCopyItemPath(void) const
 {
@@ -87,7 +83,7 @@ void Explorerplusplus::OnFileRename(void)
 	}
 }
 
-void Explorerplusplus::OnFileDelete(BOOL bPermanent)
+void Explorerplusplus::OnFileDelete(bool permanent)
 {
 	HWND hFocus;
 
@@ -95,11 +91,11 @@ void Explorerplusplus::OnFileDelete(BOOL bPermanent)
 
 	if(hFocus == m_hActiveListView)
 	{
-		OnListViewFileDelete(bPermanent);
+		OnListViewFileDelete(permanent);
 	}
 	else if(hFocus == m_hTreeView)
 	{
-		OnTreeViewFileDelete(bPermanent);
+		OnTreeViewFileDelete(permanent);
 	}
 }
 
@@ -160,10 +156,6 @@ void Explorerplusplus::OnRightClick(NMHDR *nmhdr)
 
 		OnListViewHeaderRClick(&CursorPos);
 	}
-	else if(nmhdr->hwndFrom == m_hMainToolbar)
-	{
-		OnMainToolbarRClick();
-	}
 }
 
 void Explorerplusplus::OnPaste(void)
@@ -180,4 +172,119 @@ void Explorerplusplus::OnPaste(void)
 	{
 		OnTreeViewPaste();
 	}
+}
+
+BOOL Explorerplusplus::OnMouseWheel(MousewheelSource_t MousewheelSource, WPARAM wParam, LPARAM lParam)
+{
+	short zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+	m_zDeltaTotal += zDelta;
+
+	DWORD dwCursorPos = GetMessagePos();
+	POINTS pts = MAKEPOINTS(dwCursorPos);
+
+	POINT pt;
+	pt.x = pts.x;
+	pt.y = pts.y;
+
+	HWND hwnd = WindowFromPoint(pt);
+
+	BOOL bMessageHandled = FALSE;
+
+	/* Normally, mouse wheel messages will be sent
+	to the window with focus. We want to be able to
+	scroll windows even if they do not have focus,
+	so we'll capture the mouse wheel message and
+	and forward it to the window currently underneath
+	the mouse. */
+	if (hwnd == m_hActiveListView)
+	{
+		if (wParam & MK_CONTROL)
+		{
+			/* Switch listview views. For each wheel delta
+			(notch) the wheel is scrolled through, switch
+			the view once. */
+			for (int i = 0; i < abs(m_zDeltaTotal / WHEEL_DELTA); i++)
+			{
+				CycleViewState((m_zDeltaTotal > 0));
+			}
+		}
+		else if (wParam & MK_SHIFT)
+		{
+			if (m_zDeltaTotal < 0)
+			{
+				for (int i = 0; i < abs(m_zDeltaTotal / WHEEL_DELTA); i++)
+				{
+					OnBrowseBack();
+				}
+			}
+			else
+			{
+				for (int i = 0; i < abs(m_zDeltaTotal / WHEEL_DELTA); i++)
+				{
+					OnBrowseForward();
+				}
+			}
+		}
+		else
+		{
+			if (MousewheelSource != MOUSEWHEEL_SOURCE_LISTVIEW)
+			{
+				bMessageHandled = TRUE;
+				SendMessage(m_hActiveListView, WM_MOUSEWHEEL, wParam, lParam);
+			}
+		}
+	}
+	else if (hwnd == m_hTreeView)
+	{
+		if (MousewheelSource != MOUSEWHEEL_SOURCE_TREEVIEW)
+		{
+			bMessageHandled = TRUE;
+			SendMessage(m_hTreeView, WM_MOUSEWHEEL, wParam, lParam);
+		}
+	}
+	else if (hwnd == m_tabContainer->GetHWND())
+	{
+		bMessageHandled = TRUE;
+
+		HWND hUpDown = FindWindowEx(m_tabContainer->GetHWND(), NULL, UPDOWN_CLASS, NULL);
+
+		if (hUpDown != NULL)
+		{
+			BOOL bSuccess;
+			int iPos = static_cast<int>(SendMessage(hUpDown, UDM_GETPOS32, 0, reinterpret_cast<LPARAM>(&bSuccess)));
+
+			if (bSuccess)
+			{
+				int iScrollPos = iPos;
+
+				int iLow;
+				int iHigh;
+				SendMessage(hUpDown, UDM_GETRANGE32, reinterpret_cast<WPARAM>(&iLow), reinterpret_cast<LPARAM>(&iHigh));
+
+				if (m_zDeltaTotal < 0)
+				{
+					if (iScrollPos < iHigh)
+					{
+						iScrollPos++;
+					}
+				}
+				else
+				{
+					if (iScrollPos > iLow)
+					{
+						iScrollPos--;
+					}
+				}
+
+				SendMessage(m_tabContainer->GetHWND(), WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, iScrollPos), NULL);
+			}
+		}
+	}
+
+	if (abs(m_zDeltaTotal) >= WHEEL_DELTA)
+	{
+		m_zDeltaTotal = m_zDeltaTotal % WHEEL_DELTA;
+	}
+
+	return bMessageHandled;
 }

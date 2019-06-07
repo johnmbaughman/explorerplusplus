@@ -1,28 +1,18 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: WildcardSelectDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Allows items to be selected/deselected based
- * on a wildcard filter.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
 #include "WildcardSelectDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
+#include "ShellBrowser/iShellView.h"
 #include "../Helper/BaseDialog.h"
 #include "../Helper/Helper.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/XMLSettings.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
-
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/XMLSettings.h"
 
 const TCHAR CWildcardSelectDialogPersistentSettings::SETTINGS_KEY[] = _T("WildcardSelect");
 
@@ -51,7 +41,7 @@ INT_PTR CWildcardSelectDialog::OnInitDialog()
 
 	HWND hComboBox = GetDlgItem(m_hDlg,IDC_SELECTGROUP_COMBOBOX);
 
-	for each(auto strPattern in m_pwsdps->m_PatternList)
+	for(const auto &strPattern : m_pwsdps->m_PatternList)
 	{
 		ComboBox_InsertString(hComboBox,-1,strPattern.c_str());
 	}
@@ -231,7 +221,7 @@ void CWildcardSelectDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKe
 }
 
 void CWildcardSelectDialogPersistentSettings::SaveExtraXMLSettings(
-	MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pParentNode)
+	IXMLDOMDocument *pXMLDom,IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddStringListToNode(pXMLDom, pParentNode, SETTING_PATTERN_LIST, m_PatternList);
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_CURRENT_TEXT, m_szPattern);

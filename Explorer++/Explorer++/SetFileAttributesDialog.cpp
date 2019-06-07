@@ -1,24 +1,13 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: SetFileAttributesDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides the ability to change the attributes
- * and creation/modification/access dates of a set
- * of files.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <list>
 #include "SetFileAttributesDialog.h"
 #include "MainResource.h"
 #include "../Helper/Helper.h"
 #include "../Helper/TimeHelper.h"
+#include <list>
 
 
 const TCHAR CSetFileAttributesDialogPersistentSettings::SETTINGS_KEY[] = _T("SetFileAttributes");
@@ -53,7 +42,7 @@ INT_PTR CSetFileAttributesDialog::OnInitDialog()
 	int nReadOnly = 0;
 	int nIndexed = 0;
 
-	for each(auto File in m_FileList)
+	for(const auto &File : m_FileList)
 	{
 		if(File.wfd.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
 			nArchived++;
@@ -285,7 +274,7 @@ void CSetFileAttributesDialog::OnOk()
 	attributes (i.e. those that are active for all files).
 	Any attributes which are indeterminate will not change
 	(note that they are per-file). */
-	for each(auto Attribute in m_AttributeList)
+	for(auto &Attribute : m_AttributeList)
 	{
 		Attribute.uChecked = static_cast<UINT>(SendMessage(GetDlgItem(m_hDlg,
 			Attribute.uControlId),BM_GETCHECK,0,0));
@@ -297,11 +286,11 @@ void CSetFileAttributesDialog::OnOk()
 		}
 	}
 
-	for each(auto File in m_FileList)
+	for(const auto &File : m_FileList)
 	{
 		FileAttributes = AllFileAttributes;
 
-		for each(auto Attribute in m_AttributeList)
+		for(const auto &Attribute : m_AttributeList)
 		{
 			/* If the check box is indeterminate, this attribute will
 			stay the same (i.e. if a file had the attribute applied

@@ -1,20 +1,12 @@
-/******************************************************************
- *
- * Project: Helper
- * File: ContextMenuManager.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * This class is designed to show an existing menu, with
  * has been modified to also show menu items inserted
  * by shell extensions.
- *
- * References:
- * http://windowsxp.mvps.org/context_folders.htm
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include <vector>
@@ -77,7 +69,7 @@ CContextMenuManager::CContextMenuManager(ContextMenuType_t ContextMenuType,
 
 	/* Initialize the shell extensions, and extract
 	an IContextMenu interface. */
-	for each(auto ContextMenuHandler in m_ContextMenuHandlers)
+	for(const auto &ContextMenuHandler : m_ContextMenuHandlers)
 	{
 		IShellExtInit *pShellExtInit = NULL;
 		HRESULT hr;
@@ -139,7 +131,7 @@ CContextMenuManager::CContextMenuManager(ContextMenuType_t ContextMenuType,
 CContextMenuManager::~CContextMenuManager()
 {
 	/* Release the IContextMenu interfaces. */
-	for each(auto MenuHandler in m_MenuHandlers)
+	for(auto MenuHandler : m_MenuHandlers)
 	{
 		if(MenuHandler.pContextMenuActual != NULL)
 		{
@@ -148,7 +140,7 @@ CContextMenuManager::~CContextMenuManager()
 	}
 
 	/* ...and free the necessary DLL's. */
-	for each(auto ContextMenuHandler in m_ContextMenuHandlers)
+	for(auto ContextMenuHandler : m_ContextMenuHandlers)
 	{
 		ContextMenuHandler.pUnknown->Release();
 
@@ -386,7 +378,7 @@ HRESULT CContextMenuManager::HandleMenuMessage(UINT uMsg,WPARAM wParam,
 
 	if(uItemID != -1)
 	{
-		for each(auto MenuHandler in m_MenuHandlers)
+		for(auto MenuHandler : m_MenuHandlers)
 		{
 			if(uItemID >= MenuHandler.uStartID &&
 				uItemID < MenuHandler.uEndID)
@@ -414,7 +406,7 @@ HRESULT CContextMenuManager::GetMenuHelperText(UINT uID,TCHAR *szText,UINT cchMa
 {
 	HRESULT hr = E_FAIL;
 
-	for each(auto MenuHandler in m_MenuHandlers)
+	for(auto MenuHandler : m_MenuHandlers)
 	{
 		if(uID >= MenuHandler.uStartID &&
 			uID < MenuHandler.uEndID)
@@ -450,7 +442,7 @@ int CContextMenuManager::GetMenuItemPos(HMENU hMenu,UINT uID)
 
 void CContextMenuManager::InvokeMenuEntry(HWND hwnd,UINT uCmd)
 {
-	for each(auto MenuHandler in m_MenuHandlers)
+	for(auto MenuHandler : m_MenuHandlers)
 	{
 		if(uCmd >= MenuHandler.uStartID &&
 			uCmd < MenuHandler.uEndID)

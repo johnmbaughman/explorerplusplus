@@ -1,5 +1,12 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include "BookmarkHelper.h"
+#include "CoreInterface.h"
+#include "TabContainerInterface.h"
 #include "../Helper/Bookmark.h"
 #include <boost/optional.hpp>
 
@@ -46,7 +53,9 @@ class CBookmarksToolbar : public NBookmark::IBookmarkItemNotification
 
 public:
 
-	CBookmarksToolbar(HWND hToolbar, IExplorerplusplus *pexpp, CBookmarkFolder &AllBookmarks, const GUID &guidBookmarksToolbar, UINT uIDStart, UINT uIDEnd);
+	CBookmarksToolbar(HWND hToolbar, HINSTANCE instance, IExplorerplusplus *pexpp,
+		TabContainerInterface *tabContainer, CBookmarkFolder &AllBookmarks,
+		const GUID &guidBookmarksToolbar, UINT uIDStart, UINT uIDEnd);
 	~CBookmarksToolbar();
 
 	/* IBookmarkItemNotification methods. */
@@ -80,17 +89,30 @@ private:
 
 	void	RemoveBookmarkItem(const GUID &guid);
 
+	void	OpenBookmarkItemInNewTab(const VariantBookmark &variantBookmarkItem);
+
 	bool	OnCommand(WPARAM wParam, LPARAM lParam);
+	bool	OnButtonClick(int command);
+	BOOL	OnRightClick(const NMMOUSE *nmm);
+	void	OnRightClickMenuItemSelected(int menuItemId, const VariantBookmark &variantBookmark);
+	void	ShowBookmarkFolderMenu(const CBookmarkFolder &bookmarkFolder, int command, int index);
+	void	OnBookmarkMenuItemClicked(const CBookmark &bookmark);
+	void	OnNewBookmark();
 	bool	OnGetInfoTip(NMTBGETINFOTIP *infoTip);
+
+	void	OnToolbarContextMenuPreShow(HMENU menu, HWND sourceWindow);
 
 	int		GetBookmarkItemIndex(const GUID &guid);
 
-	boost::optional<NBookmarkHelper::variantBookmark_t>	GetBookmarkItemFromToolbarIndex(int index);
+	VariantBookmark	*GetBookmarkItemFromToolbarIndex(int index);
 
 	HWND							m_hToolbar;
 	HIMAGELIST						m_himl;
 
+	HINSTANCE						m_instance;
+
 	IExplorerplusplus				*m_pexpp;
+	TabContainerInterface			*m_tabContainer;
 
 	CBookmarkFolder					&m_AllBookmarks;
 	GUID							m_guidBookmarksToolbar;
@@ -101,4 +123,6 @@ private:
 	UINT							m_uIDCounter;
 
 	CBookmarksToolbarDropHandler	*m_pbtdh;
+
+	boost::signals2::connection		m_toolbarContextMenuConnection;
 };

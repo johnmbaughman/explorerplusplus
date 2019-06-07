@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: MyTreeView
- * File: iDropTarget.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides support for acting as a drop target.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "MyTreeView.h"
@@ -45,7 +36,7 @@ DWORD grfKeyState,POINTL pt,DWORD *pdwEffect)
 
 	/* Check whether the drop source has the type of data
 	that is needed for this drag operation. */
-	for each(auto ftc in ftcList)
+	for(auto ftc : ftcList)
 	{
 		if(pDataObject->QueryGetData(&ftc) == S_OK)
 		{

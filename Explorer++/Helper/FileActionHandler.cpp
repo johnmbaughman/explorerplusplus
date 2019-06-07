@@ -1,21 +1,16 @@
-/******************************************************************
- *
- * Project: Helper
- * File: FileActionHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Performs file actions and saves information about them.
  * Also allows file actions to be undone.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
-#include <vector>
 #include "FileActionHandler.h"
 #include "../Helper/FileOperations.h"
+#include "../Helper/Macros.h"
 
 
 CFileActionHandler::CFileActionHandler()
@@ -25,80 +20,79 @@ CFileActionHandler::CFileActionHandler()
 
 CFileActionHandler::~CFileActionHandler()
 {
-	while(m_stackFileActions.size() > 0)
-	{
-		UndoItem_t UndoItem = m_stackFileActions.top();
-		m_stackFileActions.pop();
 
-		delete UndoItem.pInfo;
-	}
 }
 
-BOOL CFileActionHandler::RenameFiles(const std::list<RenamedItem_t> &ItemList)
+BOOL CFileActionHandler::RenameFiles(const RenamedItems_t &itemList)
 {
-	std::list<RenamedItem_t> *pRenamedItemList = new std::list<RenamedItem_t>;
+	RenamedItems_t renamedItems;
 
-	for each(auto Item in ItemList)
+	for(const auto &item : itemList)
 	{
-		BOOL bRes = NFileOperations::RenameFile(Item.strOldFilename,Item.strNewFilename);
+		/* TODO: This should actually be done by the caller. */
+		IShellItem *shellItem = nullptr;
+		HRESULT hr = SHCreateItemFromParsingName(item.strOldFilename.c_str(), nullptr, IID_PPV_ARGS(&shellItem));
 
-		if(bRes)
+		if (SUCCEEDED(hr))
 		{
-			RenamedItem_t RenamedItem;
-			RenamedItem.strOldFilename = Item.strOldFilename;
-			RenamedItem.strNewFilename = Item.strNewFilename;
-			pRenamedItemList->push_back(RenamedItem);
+			TCHAR newFilename[MAX_PATH];
+			StringCchCopy(newFilename, SIZEOF_ARRAY(newFilename), item.strNewFilename.c_str());
+			PathStripPath(newFilename);
+
+			/* TODO: Could rename all files in the list in a single
+			operation, rather than one by one.*/
+			hr = NFileOperations::RenameFile(shellItem, newFilename);
+
+			if (SUCCEEDED(hr))
+			{
+				renamedItems.push_back(item);
+			}
+
+			shellItem->Release();
 		}
 	}
 
 	/* Only store an undo operation if at least one
 	file was actually renamed. */
-	if(pRenamedItemList->size() > 0)
+	if(renamedItems.size() > 0)
 	{
 		UndoItem_t UndoItem;
 		UndoItem.Type = FILE_ACTION_RENAMED;
-		UndoItem.pInfo = reinterpret_cast<void *>(pRenamedItemList);
+		UndoItem.renamedItems = renamedItems;	
 		m_stackFileActions.push(UndoItem);
 
 		return TRUE;
 	}
 
-	delete pRenamedItemList;
-
 	return FALSE;
 }
 
-BOOL CFileActionHandler::DeleteFiles(HWND hwnd,const std::list<std::wstring> &FullFilenameList,
-	BOOL bPermanent,BOOL bSilent)
+HRESULT CFileActionHandler::DeleteFiles(HWND hwnd, DeletedItems_t &deletedItems,
+	bool permanent, bool silent)
 {
-	BOOL bRes = NFileOperations::DeleteFiles(hwnd,FullFilenameList,bPermanent,bSilent);
+	HRESULT hr = NFileOperations::DeleteFiles(hwnd, deletedItems, permanent, silent);
 
-	if(bRes)
+	if(SUCCEEDED(hr))
 	{
-		std::list<std::wstring> *pDeletedItemList = new std::list<std::wstring>(FullFilenameList);
-
 		UndoItem_t UndoItem;
 		UndoItem.Type = FILE_ACTION_DELETED;
-		UndoItem.pInfo = reinterpret_cast<void *>(pDeletedItemList);
+		UndoItem.deletedItems = deletedItems;
 		m_stackFileActions.push(UndoItem);
 	}
 
-	return bRes;
+	return hr;
 }
 
 void CFileActionHandler::Undo()
 {
 	if(!m_stackFileActions.empty())
 	{
-		UndoItem_t UndoItem = m_stackFileActions.top();
-		m_stackFileActions.pop();
+		UndoItem_t &undoItem = m_stackFileActions.top();
 
-		assert(UndoItem.pInfo != NULL);
-
-		switch(UndoItem.Type)
+		switch(undoItem.Type)
 		{
 		case FILE_ACTION_RENAMED:
-			UndoRenameOperation(*(reinterpret_cast<std::list<RenamedItem_t> *>(UndoItem.pInfo)));
+			UndoRenameOperation(undoItem.renamedItems);
 			break;
 
 		case FILE_ACTION_COPIED:
@@ -108,21 +102,21 @@ void CFileActionHandler::Undo()
 			break;
 
 		case FILE_ACTION_DELETED:
-			UndoDeleteOperation(*(reinterpret_cast<std::list<std::wstring> *>(UndoItem.pInfo)));
+			UndoDeleteOperation(undoItem.deletedItems);
 			break;
 		}
 
-		delete UndoItem.pInfo;
+		m_stackFileActions.pop();
 	}
 }
 
-void CFileActionHandler::UndoRenameOperation(const std::list<RenamedItem_t> &RenamedItemList)
+void CFileActionHandler::UndoRenameOperation(const RenamedItems_t &renamedItemList)
 {
-	std::list<RenamedItem_t> UndoList;
+	RenamedItems_t UndoList;
 
 	/* When undoing a rename operation, the new name
 	becomes the old name, and vice versa. */
-	for each(auto RenamedItem in RenamedItemList)
+	for(const auto &RenamedItem : renamedItemList)
 	{
 		RenamedItem_t UndoItem;
 		UndoItem.strOldFilename = RenamedItem.strNewFilename;
@@ -133,9 +127,9 @@ void CFileActionHandler::UndoRenameOperation(const std::list<RenamedItem_t> &Ren
 	RenameFiles(UndoList);
 }
 
-void CFileActionHandler::UndoDeleteOperation(const std::list<std::wstring> &DeletedItemList)
+void CFileActionHandler::UndoDeleteOperation(const DeletedItems_t &deletedItemList)
 {
-	UNREFERENCED_PARAMETER(DeletedItemList);
+	UNREFERENCED_PARAMETER(deletedItemList);
 
 	/* Move the file back out of the recycle bin,
 	and push a delete action back onto the stack.

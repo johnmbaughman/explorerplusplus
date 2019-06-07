@@ -1,9 +1,15 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
-#include <unordered_map>
+#include "CoreInterface.h"
+#include "ShellBrowser/iShellView.h"
 #include "../Helper/BaseDialog.h"
-#include "../Helper/ResizableDialog.h"
 #include "../Helper/DialogSettings.h"
+#include "../Helper/ResizableDialog.h"
+#include <unordered_map>
 
 enum FolderType_t
 {
@@ -42,7 +48,7 @@ private:
 	void			SaveExtraRegistrySettings(HKEY hKey);
 	void			LoadExtraRegistrySettings(HKEY hKey);
 
-	void			SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	void			SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	void			LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	FolderType_t	m_FolderType;

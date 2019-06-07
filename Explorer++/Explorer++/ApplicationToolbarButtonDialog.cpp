@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: iServiceProvider.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * New/edit dialog for the application toolbar.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "ApplicationToolbarButtonDialog.h"
@@ -18,9 +9,9 @@
 
 CApplicationToolbarButtonDialog::CApplicationToolbarButtonDialog(HINSTANCE hInstance,
 	int iResource,HWND hParent,ApplicationButton_t *Button,bool IsNew) :
-m_Button(Button),
-m_IsNew(IsNew),
-CBaseDialog(hInstance,iResource,hParent,false)
+	CBaseDialog(hInstance, iResource, hParent, false),
+	m_Button(Button),
+	m_IsNew(IsNew)
 {
 	
 }
@@ -104,7 +95,7 @@ INT_PTR CApplicationToolbarButtonDialog::OnCommand(WPARAM wParam,LPARAM lParam)
 void CApplicationToolbarButtonDialog::OnChooseFile()
 {
 	/* TODO: Text needs to be localized. */
-	TCHAR *Filter = _T("Programs (*.exe)\0*.exe\0All Files\0*.*\0\0");
+	const TCHAR *Filter = _T("Programs (*.exe)\0*.exe\0All Files\0*.*\0\0");
 	TCHAR FullFileName[MAX_PATH] = EMPTY_STRING;
 
 	OPENFILENAME ofn;

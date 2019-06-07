@@ -1,22 +1,14 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: ListView.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Manages the edit control in the main listview.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
 #include "ListViewEdit.h"
+#include "Explorer++_internal.h"
+#include "ShellBrowser/iShellView.h"
+#include "../Helper/Helper.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
-
 
 CListViewEdit *CListViewEdit::CreateNew(HWND hwnd,int ItemIndex,IExplorerplusplus *pexpp)
 {

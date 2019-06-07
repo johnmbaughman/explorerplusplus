@@ -1,22 +1,17 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: TabBackingHandler.cpp
- * License: GPL - See LICENSE in the top level directory
- *
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
+/*
  * Manages the 'tab backing' panel, which sits
  * behind the tab control.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+ */
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "Config.h"
 #include "Explorer++_internal.h"
 #include "../Helper/Macros.h"
-
 
 LRESULT CALLBACK TabBackingProcStub(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lParam,UINT_PTR uIdSubclass,DWORD_PTR dwRefData);
 
@@ -44,30 +39,14 @@ UINT msg,WPARAM wParam,LPARAM lParam)
 {
 	switch(msg)
 	{
-		case WM_INITMENU:
-			SendMessage(m_hContainer,WM_INITMENU,wParam,lParam);
-			break;
-
-		case WM_MEASUREITEM:
-			{
-				MEASUREITEMSTRUCT	*pMeasureItem = NULL;
-
-				pMeasureItem = (MEASUREITEMSTRUCT *)lParam;
-
-				pMeasureItem->itemWidth = 20;
-				pMeasureItem->itemHeight = 10;
-
-			}
-			break;
-
 		case WM_LBUTTONDBLCLK:
 			{
-				HRESULT hr;
+				HRESULT hr = CreateNewTab(m_config->defaultTabDirectory.c_str(), TabSettings(_selected = true));
 
-				hr = BrowseFolder(m_DefaultTabDirectory,SBSP_ABSOLUTE,TRUE,TRUE,FALSE);
-
-				if(FAILED(hr))
-					BrowseFolder(m_DefaultTabDirectoryStatic,SBSP_ABSOLUTE,TRUE,TRUE,FALSE);
+				if (FAILED(hr))
+				{
+					CreateNewTab(m_config->defaultTabDirectoryStatic.c_str(), TabSettings(_selected = true));
+				}
 			}
 			break;
 
@@ -84,11 +63,7 @@ UINT msg,WPARAM wParam,LPARAM lParam)
 			switch(((LPNMHDR)lParam)->code)
 			{
 				case TCN_SELCHANGE:
-					OnTabSelectionChange();
-					break;
-
-				case TTN_GETDISPINFO:
-					OnTabCtrlGetDispInfo(lParam);
+					OnTabSelectionChanged();
 					break;
 			}
 			break;

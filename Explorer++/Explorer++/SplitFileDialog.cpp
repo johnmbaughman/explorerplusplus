@@ -1,29 +1,24 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: SplitFileDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Provides the ability to split a file into several
- * pieces.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <unordered_map>
-#include "Explorer++_internal.h"
 #include "SplitFileDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
-#include "../Helper/Helper.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/XMLSettings.h"
 #include "../Helper/FileOperations.h"
-#include "../Helper/WindowHelper.h"
+#include "../Helper/Helper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/StringHelper.h"
+#include "../Helper/WindowHelper.h"
+#include "../Helper/XMLSettings.h"
+#include <boost/scope_exit.hpp>
+#include <comdef.h>
+#include <unordered_map>
 
+#pragma warning(disable:4459) // declaration of 'boost_scope_exit_aux_args' hides global declaration
 
 namespace NSplitFileDialog
 {
@@ -478,13 +473,27 @@ void CSplitFileDialog::OnChangeOutputDirectory()
 	LoadString(GetInstance(),IDS_SPLITFILEDIALOG_DIRECTORYTITLE,
 		szTitle,SIZEOF_ARRAY(szTitle));
 
-	std::wstring strOutputFilename;
-	BOOL bSucceeded = NFileOperations::CreateBrowseDialog(m_hDlg,szTitle,strOutputFilename);
+	LPITEMIDLIST pidl;
+	BOOL bSucceeded = NFileOperations::CreateBrowseDialog(m_hDlg,szTitle,&pidl);
 
-	if(bSucceeded)
+	if (!bSucceeded)
 	{
-		SetDlgItemText(m_hDlg,IDC_SPLIT_EDIT_OUTPUT,strOutputFilename.c_str());
+		return;
 	}
+
+	BOOST_SCOPE_EXIT(pidl) {
+		CoTaskMemFree(pidl);
+	} BOOST_SCOPE_EXIT_END
+
+	TCHAR parsingName[MAX_PATH];
+	HRESULT hr = GetDisplayName(pidl, parsingName, SIZEOF_ARRAY(parsingName), SHGDN_FORPARSING);
+
+	if (FAILED(hr))
+	{
+		return;
+	}
+
+	SetDlgItemText(m_hDlg, IDC_SPLIT_EDIT_OUTPUT, parsingName);
 }
 
 void CSplitFileDialog::OnSplitFinished()
@@ -674,8 +683,8 @@ void CSplitFileDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 	NRegistrySettings::ReadStringFromRegistry(hKey, SETTING_SIZE_GROUP, m_strSplitGroup);
 }
 
-void CSplitFileDialogPersistentSettings::SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
-	MSXML2::IXMLDOMElement *pParentNode)
+void CSplitFileDialogPersistentSettings::SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom,
+	IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_SIZE, m_strSplitSize.c_str());
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_SIZE_GROUP, m_strSplitGroup.c_str());

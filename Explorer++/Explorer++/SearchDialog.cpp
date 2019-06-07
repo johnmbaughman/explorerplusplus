@@ -1,33 +1,24 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: SearchDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles all messages associated with the 'Search' dialog box.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <regex>
-#include "Explorer++_internal.h"
-#include "MainImages.h"
 #include "SearchDialog.h"
 #include "DialogHelper.h"
+#include "Explorer++_internal.h"
+#include "MainImages.h"
 #include "MainResource.h"
+#include "../Helper/BaseDialog.h"
+#include "../Helper/ComboBox.h"
+#include "../Helper/Controls.h"
+#include "../Helper/FileContextMenuManager.h"
 #include "../Helper/Helper.h"
+#include "../Helper/Macros.h"
 #include "../Helper/RegistrySettings.h"
 #include "../Helper/ShellHelper.h"
-#include "../Helper/BaseDialog.h"
-#include "../Helper/FileContextMenuManager.h"
-#include "../Helper/XMLSettings.h"
-#include "../Helper/ComboBox.h"
 #include "../Helper/WindowHelper.h"
-#include "../Helper/Controls.h"
-#include "../Helper/Macros.h"
+#include "../Helper/XMLSettings.h"
+#include <regex>
 
 
 namespace NSearchDialog
@@ -61,13 +52,15 @@ const TCHAR CSearchDialogPersistentSettings::SETTING_DIRECTORY_LIST[] = _T("Dire
 const TCHAR CSearchDialogPersistentSettings::SETTING_PATTERN_LIST[] = _T("Pattern");
 
 CSearchDialog::CSearchDialog(HINSTANCE hInstance,int iResource,
-	HWND hParent,TCHAR *szSearchDirectory,IExplorerplusplus *pexpp) :
+	HWND hParent,TCHAR *szSearchDirectory,IExplorerplusplus *pexpp,
+	TabContainerInterface *tabContainer) :
 CBaseDialog(hInstance,iResource,hParent,true)
 {
 	StringCchCopy(m_szSearchDirectory,SIZEOF_ARRAY(m_szSearchDirectory),
 		szSearchDirectory);
 
 	m_pexpp = pexpp;
+	m_tabContainer = tabContainer;
 
 	m_bSearching		= FALSE;
 	m_bStopSearching	= FALSE;
@@ -121,7 +114,7 @@ INT_PTR CSearchDialog::OnInitDialog()
 
 	int i = 0;
 
-	for each(auto ci in m_sdps->m_Columns)
+	for(const auto &ci : m_sdps->m_Columns)
 	{
 		TCHAR szTemp[128];
 		LoadString(GetInstance(),ci.uStringID,szTemp,SIZEOF_ARRAY(szTemp));
@@ -150,13 +143,13 @@ INT_PTR CSearchDialog::OnInitDialog()
 	lCheckDlgButton(m_hDlg,IDC_CHECK_CASEINSENSITIVE,m_sdps->m_bCaseInsensitive);
 	lCheckDlgButton(m_hDlg,IDC_CHECK_USEREGULAREXPRESSIONS,m_sdps->m_bUseRegularExpressions);
 
-	for each(auto strDirectory in *m_sdps->m_pSearchDirectories)
+	for(const auto &strDirectory : *m_sdps->m_pSearchDirectories)
 	{
 		SendDlgItemMessage(m_hDlg,IDC_COMBO_DIRECTORY,CB_INSERTSTRING,static_cast<WPARAM>(-1),
 			reinterpret_cast<LPARAM>(strDirectory.c_str()));
 	}
 
-	for each(auto strPattern in *m_sdps->m_pSearchPatterns)
+	for(const auto strPattern : *m_sdps->m_pSearchPatterns)
 	{
 		SendDlgItemMessage(m_hDlg,IDC_COMBO_NAME,CB_INSERTSTRING,static_cast<WPARAM>(-1),
 			reinterpret_cast<LPARAM>(strPattern.c_str()));
@@ -535,7 +528,7 @@ void CSearchDialog::UpdateListViewHeader()
 
 	int iColumn = 0;
 
-	for each(auto ci in m_sdps->m_Columns)
+	for(const auto &ci : m_sdps->m_Columns)
 	{
 		if(ci.SortMode == m_sdps->m_SortMode)
 		{
@@ -666,7 +659,7 @@ BOOL CSearchDialog::HandleShellMenuItem(LPCITEMIDLIST pidlParent,
 
 	if(StrCmpI(szCmd,_T("open")) == 0)
 	{
-		for each(auto pidlItem in pidlItemList)
+		for(auto pidlItem : pidlItemList)
 		{
 			LPITEMIDLIST pidlComplete = ILCombine(pidlParent,pidlItem);
 			m_pexpp->OpenItem(pidlComplete,FALSE,FALSE);
@@ -686,7 +679,7 @@ void CSearchDialog::HandleCustomMenuItem(LPCITEMIDLIST pidlParent,
 	{
 	case MENU_ID_OPEN_FILE_LOCATION:
 		{
-			m_pexpp->BrowseFolder(pidlParent,SBSP_ABSOLUTE,TRUE,TRUE,FALSE);
+			m_tabContainer->CreateNewTab(pidlParent, TabSettings(_selected = true));
 
 			TCHAR szFilename[MAX_PATH];
 			LPITEMIDLIST pidlComplete = ILCombine(pidlParent,pidlItemList.front());
@@ -1107,7 +1100,7 @@ void CSearch::SearchDirectory(const TCHAR *szDirectory)
 
 	if(m_bSearchSubFolders)
 	{
-		for each(auto strSubFolder in SubFolderList)
+		for(const auto &strSubFolder : SubFolderList)
 		{
 			SearchDirectory(strSubFolder.c_str());
 		}
@@ -1361,7 +1354,7 @@ void CSearchDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 }
 
 void CSearchDialogPersistentSettings::SaveExtraXMLSettings(
-	MSXML2::IXMLDOMDocument *pXMLDom,MSXML2::IXMLDOMElement *pParentNode)
+	IXMLDOMDocument *pXMLDom,IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_COLUMN_WIDTH_1, NXMLSettings::EncodeIntValue(m_iColumnWidth1));
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_COLUMN_WIDTH_2, NXMLSettings::EncodeIntValue(m_iColumnWidth2));
@@ -1462,7 +1455,7 @@ template <typename T>
 void CSearchDialogPersistentSettings::CircularBufferToList(const boost::circular_buffer<T> &cb,
 	std::list<T> &list)
 {
-	for each(auto Item in cb)
+	for(auto Item : cb)
 	{
 		list.push_back(Item);
 	}
@@ -1472,7 +1465,7 @@ template <typename T>
 void CSearchDialogPersistentSettings::ListToCircularBuffer(const std::list<T> &list,
 	boost::circular_buffer<T> &cb)
 {
-	for each(auto Item in list)
+	for(auto Item : list)
 	{
 		cb.push_back(Item);
 	}

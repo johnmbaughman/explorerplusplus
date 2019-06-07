@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include "../Helper/BaseDialog.h"
@@ -31,7 +35,7 @@ private:
 	void SaveExtraRegistrySettings(HKEY hKey);
 	void LoadExtraRegistrySettings(HKEY hKey);
 
-	void SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom, MSXML2::IXMLDOMElement *pParentNode);
+	void SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom, IXMLDOMElement *pParentNode);
 	void LoadExtraXMLSettings(BSTR bstrName, BSTR bstrValue);
 
 	NFileOperations::OverwriteMethod_t	m_uOverwriteMethod;

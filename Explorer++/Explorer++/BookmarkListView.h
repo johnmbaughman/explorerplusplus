@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
 #include "BookmarkHelper.h"
@@ -14,8 +18,8 @@ public:
 	void							InsertBookmarksIntoListView(const CBookmarkFolder &BookmarkFolder);
 	int								InsertBookmarkFolderIntoListView(const CBookmarkFolder &BookmarkFolder, int iPosition);
 	int								InsertBookmarkIntoListView(const CBookmark &Bookmark, int iPosition);
-	NBookmarkHelper::variantBookmark_t	GetBookmarkItemFromListView(CBookmarkFolder &ParentBookmarkFolder, int iItem);
-	NBookmarkHelper::variantBookmark_t	GetBookmarkItemFromListViewlParam(CBookmarkFolder &ParentBookmarkFolder, LPARAM lParam);
+	VariantBookmark					&GetBookmarkItemFromListView(CBookmarkFolder &ParentBookmarkFolder, int iItem);
+	VariantBookmark					&GetBookmarkItemFromListViewlParam(CBookmarkFolder &ParentBookmarkFolder, LPARAM lParam);
 
 private:
 

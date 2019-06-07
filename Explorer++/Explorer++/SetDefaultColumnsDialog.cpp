@@ -1,28 +1,19 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: SelectColumnsDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Select Columns' dialog.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include <algorithm>
-#include "Explorer++_internal.h"
 #include "SetDefaultColumnsDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
 #include "ShellBrowser/iShellView.h"
 #include "../Helper/Helper.h"
-#include "../Helper/ShellHelper.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/XMLSettings.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/Macros.h"
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/ShellHelper.h"
+#include "../Helper/XMLSettings.h"
+#include <algorithm>
 
 
 const TCHAR CSetDefaultColumnsDialogPersistentSettings::SETTINGS_KEY[] = _T("SetDefaultColumns");
@@ -323,7 +314,7 @@ void CSetDefaultColumnsDialog::SetupFolderColumns(FolderType_t FolderType)
 
 	int iItem = 0;
 
-	for each(auto Column in *pColumnList)
+	for(const auto &Column : *pColumnList)
 	{
 		TCHAR szText[64];
 		LoadString(GetInstance(),CShellBrowser::LookupColumnNameStringIndex(Column.id),
@@ -450,8 +441,8 @@ void CSetDefaultColumnsDialogPersistentSettings::LoadExtraRegistrySettings(HKEY 
 	NRegistrySettings::ReadDwordFromRegistry(hKey, SETTING_FOLDER_TYPE, reinterpret_cast<DWORD *>(&m_FolderType));
 }
 
-void CSetDefaultColumnsDialogPersistentSettings::SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
-	MSXML2::IXMLDOMElement *pParentNode)
+void CSetDefaultColumnsDialogPersistentSettings::SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom,
+	IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_FOLDER_TYPE, NXMLSettings::EncodeIntValue(m_FolderType));
 }

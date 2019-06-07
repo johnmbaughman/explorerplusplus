@@ -1,24 +1,16 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: DestroyFilesDialog.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Handles the 'Destroy Files' dialog and associated messages.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
-#include "Explorer++_internal.h"
 #include "DestroyFilesDialog.h"
+#include "Explorer++_internal.h"
 #include "MainResource.h"
-#include "../Helper/RegistrySettings.h"
-#include "../Helper/XMLSettings.h"
+#include "../Helper/Helper.h"
 #include "../Helper/Macros.h"
-
+#include "../Helper/RegistrySettings.h"
+#include "../Helper/StringHelper.h"
+#include "../Helper/XMLSettings.h"
 
 const TCHAR CDestroyFilesDialogPersistentSettings::SETTINGS_KEY[] = _T("DestroyFiles");
 
@@ -86,7 +78,7 @@ INT_PTR CDestroyFilesDialog::OnInitDialog()
 
 	int iItem = 0;
 
-	for each(auto strFullFilename in m_FullFilenameList)
+	for(const auto &strFullFilename : m_FullFilenameList)
 	{
 		TCHAR szFullFilename[MAX_PATH];
 
@@ -304,7 +296,7 @@ void CDestroyFilesDialog::OnConfirmDestroy()
 	}
 
 	/* TODO: Perform in background thread. */
-	for each(auto strFullFilename in m_FullFilenameList)
+	for(const auto &strFullFilename : m_FullFilenameList)
 	{
 		DeleteFileSecurely(strFullFilename,OverwriteMethod);
 	}
@@ -339,8 +331,8 @@ void CDestroyFilesDialogPersistentSettings::LoadExtraRegistrySettings(HKEY hKey)
 	NRegistrySettings::ReadDwordFromRegistry(hKey, SETTING_OVERWRITE_METHOD, reinterpret_cast<LPDWORD>(&m_uOverwriteMethod));
 }
 
-void CDestroyFilesDialogPersistentSettings::SaveExtraXMLSettings(MSXML2::IXMLDOMDocument *pXMLDom,
-	MSXML2::IXMLDOMElement *pParentNode)
+void CDestroyFilesDialogPersistentSettings::SaveExtraXMLSettings(IXMLDOMDocument *pXMLDom,
+	IXMLDOMElement *pParentNode)
 {
 	NXMLSettings::AddAttributeToNode(pXMLDom, pParentNode, SETTING_OVERWRITE_METHOD, NXMLSettings::EncodeIntValue(m_uOverwriteMethod));
 }

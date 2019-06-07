@@ -1,3 +1,7 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 // stdafx.h : include file for standard system include files,
 // or project specific include files that are used frequently, but
 // are changed infrequently
@@ -21,6 +25,11 @@
 
 #define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES	1
 #define STRICT
+
+// While wstring_convert is deprecated in C++17, it won't be removed from the
+// language until a replacement is added. Therefore, it should be safe to keep
+// using it for now and the deprecation warning can be ignored.
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
 // Windows Header Files:
 #include <winsock2.h>

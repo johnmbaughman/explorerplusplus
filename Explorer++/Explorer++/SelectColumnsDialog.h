@@ -1,8 +1,15 @@
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
+
 #pragma once
 
+#include "CoreInterface.h"
+#include "TabInterface.h"
+#include "TabContainer.h"
 #include "../Helper/BaseDialog.h"
-#include "../Helper/ResizableDialog.h"
 #include "../Helper/DialogSettings.h"
+#include "../Helper/ResizableDialog.h"
 
 class CSelectColumnsDialog;
 
@@ -30,7 +37,8 @@ class CSelectColumnsDialog : public CBaseDialog
 {
 public:
 
-	CSelectColumnsDialog(HINSTANCE hInstance,int iResource,HWND hParent,IExplorerplusplus *pexpp);
+	CSelectColumnsDialog(HINSTANCE hInstance, int iResource, HWND hParent, IExplorerplusplus *pexpp,
+		CTabContainer *tabContainer, TabInterface *ti);
 	~CSelectColumnsDialog();
 
 protected:
@@ -54,6 +62,8 @@ private:
 	void	OnMoveColumn(bool bUp);
 
 	IExplorerplusplus	*m_pexpp;
+	CTabContainer	*m_tabContainer;
+	TabInterface	*m_ti;
 	BOOL	m_bColumnsSwapped;
 
 	HICON	m_hDialogIcon;

@@ -1,15 +1,6 @@
-/******************************************************************
- *
- * Project: Explorer++
- * File: HardwareChangeNotifier.cpp
- * License: GPL - See LICENSE in the top level directory
- *
- * Sends out hardware change notifications.
- *
- * Written by David Erceg
- * www.explorerplusplus.com
- *
- *****************************************************************/
+// Copyright (C) Explorer++ Project
+// SPDX-License-Identifier: GPL-3.0-only
+// See LICENSE in the top level directory
 
 #include "stdafx.h"
 #include "HardwareChangeNotifier.h"
@@ -54,7 +45,7 @@ void CHardwareChangeNotifier::NotifyDeviceRemovalComplete(DEV_BROADCAST_HDR *dbh
 
 void CHardwareChangeNotifier::NotifyObservers(NotificationType_t NotificationType,DEV_BROADCAST_HDR *dbh)
 {
-	for each(auto hcn in m_Observers)
+	for(const auto &hcn : m_Observers)
 	{
 		switch(NotificationType)
 		{
